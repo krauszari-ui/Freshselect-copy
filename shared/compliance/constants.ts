@@ -128,6 +128,20 @@ export const PERMISSIONS = {
   MEDICAID_ID_REVEAL: "medicaid_id:reveal",
   AUDIT_VIEW: "audit:view",
   EXPORT: "export:run",
+  // Phase 3
+  SERVICE_VIEW: "service:view",
+  SERVICE_MANAGE: "service:manage",
+  BILLING_VIEW: "billing:view",
+  BILLING_MANAGE: "billing:manage",
+  BILLING_APPROVE: "billing:approve",
+  AUDIT_MANAGE: "audit:manage",
+  FINDING_MANAGE: "finding:manage",
+  FINDING_CLOSE: "finding:close",
+  OVERPAYMENT_VIEW: "overpayment:view",
+  OVERPAYMENT_MANAGE: "overpayment:manage",
+  NUTRITION_VIEW: "nutrition:view",
+  NUTRITION_MANAGE: "nutrition:manage",
+  CLINICAL_APPROVE: "clinical:approve",
 } as const;
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 

@@ -1154,3 +1154,488 @@ export const complianceReadiness = mysqlTable("complianceReadiness", {
 });
 export type ComplianceReadiness = typeof complianceReadiness.$inferSelect;
 export type InsertComplianceReadiness = typeof complianceReadiness.$inferInsert;
+
+// ════════════════════════════════════════════════════════════════════════════
+//  COMPLIANCE MODULE — Phase 3: nutrition, delivery, billing, self-audit/CAPA,
+//  overpayments. Same conventions: FKs, version, soft-delete, effective dates,
+//  DECIMAL money, append-only history, no hard delete.
+// ════════════════════════════════════════════════════════════════════════════
+
+// ─── Nutrition ───────────────────────────────────────────────────────────────
+export const nutritionAssessments = mysqlTable("nutritionAssessments", {
+  id: int("id").autoincrement().primaryKey(),
+  submissionId: int("submissionId").notNull().references(() => submissions.id),
+  assessmentDate: timestamp("assessmentDate"),
+  clinicalCriteria: text("clinicalCriteria"),
+  nutritionDiagnosis: text("nutritionDiagnosis"),
+  allergies: text("allergies"),
+  dietaryRestrictions: text("dietaryRestrictions"),
+  culturalPreferences: text("culturalPreferences"),
+  medicalRestrictions: text("medicalRestrictions"),
+  reassessmentDate: timestamp("reassessmentDate"),
+  effectiveStartDate: timestamp("effectiveStartDate"),
+  effectiveEndDate: timestamp("effectiveEndDate"),
+  superseded: boolean("superseded").notNull().default(false),
+  recordStatus: mysqlEnum("recordStatus", ["active", "archived", "voided", "superseded"]).notNull().default("active"),
+  version: int("version").notNull().default(1),
+  createdBy: int("createdBy").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => ({ idx_nutritionAssessments_submissionId: index("idx_nutritionAssessments_submissionId").on(t.submissionId) }));
+export type NutritionAssessment = typeof nutritionAssessments.$inferSelect;
+export type InsertNutritionAssessment = typeof nutritionAssessments.$inferInsert;
+
+export const nutritionPlans = mysqlTable("nutritionPlans", {
+  id: int("id").autoincrement().primaryKey(),
+  submissionId: int("submissionId").notNull().references(() => submissions.id),
+  assessmentId: int("assessmentId").references(() => nutritionAssessments.id),
+  serviceCategory: varchar("serviceCategory", { length: 128 }),
+  frequency: varchar("frequency", { length: 64 }),
+  duration: varchar("duration", { length: 64 }),
+  status: mysqlEnum("status", ["draft", "active", "superseded"]).notNull().default("draft"),
+  currentVersion: int("currentVersion").notNull().default(1),
+  createdBy: int("createdBy").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => ({ idx_nutritionPlans_submissionId: index("idx_nutritionPlans_submissionId").on(t.submissionId) }));
+export type NutritionPlan = typeof nutritionPlans.$inferSelect;
+
+export const nutritionPlanVersions = mysqlTable("nutritionPlanVersions", {
+  id: int("id").autoincrement().primaryKey(),
+  planId: int("planId").notNull().references(() => nutritionPlans.id),
+  version: int("version").notNull(),
+  mealPlan: text("mealPlan"),
+  dietCategory: varchar("dietCategory", { length: 128 }),
+  evidenceDocumentId: int("evidenceDocumentId").references(() => complianceDocuments.id),
+  createdBy: int("createdBy").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => ({ uniq_nutritionPlanVersions: uniqueIndex("uniq_nutritionPlanVersions").on(t.planId, t.version) }));
+export type NutritionPlanVersion = typeof nutritionPlanVersions.$inferSelect;
+
+export const clinicalApprovals = mysqlTable("clinicalApprovals", {
+  id: int("id").autoincrement().primaryKey(),
+  submissionId: int("submissionId").notNull().references(() => submissions.id),
+  planId: int("planId").references(() => nutritionPlans.id),
+  assessmentId: int("assessmentId").references(() => nutritionAssessments.id),
+  reviewerId: int("reviewerId").references(() => users.id),
+  reviewerName: varchar("reviewerName", { length: 256 }),
+  /** Snapshot of the reviewer's credential at approval time. */
+  credentialType: varchar("credentialType", { length: 32 }),
+  credentialNumber: varchar("credentialNumber", { length: 64 }),
+  credentialValidFrom: timestamp("credentialValidFrom"),
+  credentialValidUntil: timestamp("credentialValidUntil"),
+  approvalDate: timestamp("approvalDate"),
+  serviceDate: timestamp("serviceDate"),
+  outcome: mysqlEnum("outcome", ["approved", "rejected"]).notNull().default("approved"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => ({ idx_clinicalApprovals_submissionId: index("idx_clinicalApprovals_submissionId").on(t.submissionId) }));
+export type ClinicalApproval = typeof clinicalApprovals.$inferSelect;
+export type InsertClinicalApproval = typeof clinicalApprovals.$inferInsert;
+
+// ─── Service delivery ────────────────────────────────────────────────────────
+export const servicePlans = mysqlTable("servicePlans", {
+  id: int("id").autoincrement().primaryKey(),
+  submissionId: int("submissionId").notNull().references(() => submissions.id),
+  authorizationId: int("authorizationId").references(() => serviceAuthorizations.id),
+  serviceCategory: varchar("serviceCategory", { length: 128 }),
+  status: mysqlEnum("status", ["active", "completed", "cancelled"]).notNull().default("active"),
+  createdBy: int("createdBy").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type ServicePlan = typeof servicePlans.$inferSelect;
+
+export const serviceEncounters = mysqlTable("serviceEncounters", {
+  id: int("id").autoincrement().primaryKey(),
+  submissionId: int("submissionId").notNull().references(() => submissions.id),
+  authorizationId: int("authorizationId").references(() => serviceAuthorizations.id),
+  referralId: int("referralId").references(() => scnReferrals.id),
+  serviceCategory: varchar("serviceCategory", { length: 128 }),
+  dateOfService: timestamp("dateOfService"),
+  units: int("units").notNull().default(0),
+  unitType: mysqlEnum("unitType", ["meal", "box", "delivery", "day", "week", "unit"]).notNull().default("unit"),
+  itemDescription: text("itemDescription"),
+  dietCategory: varchar("dietCategory", { length: 128 }),
+  /** State machine: draft→documented→pending_review→approved→locked→invoiced→paid… */
+  state: mysqlEnum("state", ["draft", "documented", "pending_review", "approved", "locked", "invoiced", "paid", "corrected_by_amendment", "voided"]).notNull().default("draft"),
+  documentationCompletedAt: timestamp("documentationCompletedAt"),
+  approvedBy: int("approvedBy").references(() => users.id),
+  invoiceLineId: int("invoiceLineId"),
+  recordStatus: mysqlEnum("recordStatus", ["active", "archived", "voided", "superseded"]).notNull().default("active"),
+  version: int("version").notNull().default(1),
+  createdBy: int("createdBy").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => ({
+  idx_serviceEncounters_submissionId: index("idx_serviceEncounters_submissionId").on(t.submissionId),
+  idx_serviceEncounters_state: index("idx_serviceEncounters_state").on(t.state),
+}));
+export type ServiceEncounter = typeof serviceEncounters.$inferSelect;
+export type InsertServiceEncounter = typeof serviceEncounters.$inferInsert;
+
+export const deliveries = mysqlTable("deliveries", {
+  id: int("id").autoincrement().primaryKey(),
+  encounterId: int("encounterId").notNull().references(() => serviceEncounters.id),
+  deliveryAddress: text("deliveryAddress"),
+  deliveredAt: timestamp("deliveredAt"),
+  staffOrVendor: varchar("staffOrVendor", { length: 256 }),
+  podMethod: mysqlEnum("podMethod", ["signature", "photo", "gps", "recipient_confirmation", "staff_attestation"]),
+  signatureDocumentId: int("signatureDocumentId").references(() => complianceDocuments.id),
+  photoDocumentId: int("photoDocumentId").references(() => complianceDocuments.id),
+  gpsEvidence: varchar("gpsEvidence", { length: 128 }),
+  temperatureRecord: varchar("temperatureRecord", { length: 64 }),
+  incident: text("incident"),
+  status: mysqlEnum("status", ["delivered", "failed", "redelivered"]).notNull().default("delivered"),
+  createdBy: int("createdBy").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => ({ idx_deliveries_encounterId: index("idx_deliveries_encounterId").on(t.encounterId) }));
+export type Delivery = typeof deliveries.$inferSelect;
+
+export const deliveryAttempts = mysqlTable("deliveryAttempts", {
+  id: int("id").autoincrement().primaryKey(),
+  encounterId: int("encounterId").notNull().references(() => serviceEncounters.id),
+  attemptedAt: timestamp("attemptedAt"),
+  failedReason: text("failedReason"),
+  redelivery: boolean("redelivery").notNull().default(false),
+  createdBy: int("createdBy").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type DeliveryAttempt = typeof deliveryAttempts.$inferSelect;
+
+/** Amendments preserve the ORIGINAL encounter values when correcting after lock. */
+export const serviceAmendments = mysqlTable("serviceAmendments", {
+  id: int("id").autoincrement().primaryKey(),
+  encounterId: int("encounterId").notNull().references(() => serviceEncounters.id),
+  reason: text("reason").notNull(),
+  /** Full snapshot of the original values (JSON) — never overwritten. */
+  originalValues: json("originalValues").notNull(),
+  amendedValues: json("amendedValues").notNull(),
+  amendedBy: int("amendedBy").references(() => users.id),
+  approvedBy: int("approvedBy").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => ({ idx_serviceAmendments_encounterId: index("idx_serviceAmendments_encounterId").on(t.encounterId) }));
+export type ServiceAmendment = typeof serviceAmendments.$inferSelect;
+
+// ─── Billing ─────────────────────────────────────────────────────────────────
+export const invoiceHeaders = mysqlTable("invoiceHeaders", {
+  id: int("id").autoincrement().primaryKey(),
+  invoiceNumber: varchar("invoiceNumber", { length: 128 }),
+  submissionId: int("submissionId").notNull().references(() => submissions.id),
+  status: mysqlEnum("status", ["draft", "validated", "approved", "submitted", "paid", "denied", "void"]).notNull().default("draft"),
+  expectedTotal: decimal("expectedTotal", { precision: 12, scale: 2 }),
+  submittedTotal: decimal("submittedTotal", { precision: 12, scale: 2 }),
+  paidTotal: decimal("paidTotal", { precision: 12, scale: 2 }),
+  submissionDate: timestamp("submissionDate"),
+  timelinessDeadline: timestamp("timelinessDeadline"),
+  acceptedDate: timestamp("acceptedDate"),
+  reconciliationStatus: mysqlEnum("reconciliationStatus", ["unreconciled", "partial", "reconciled"]).notNull().default("unreconciled"),
+  recordStatus: mysqlEnum("recordStatus", ["active", "archived", "voided", "superseded"]).notNull().default("active"),
+  version: int("version").notNull().default(1),
+  createdBy: int("createdBy").references(() => users.id),
+  approvedBy: int("approvedBy").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => ({
+  idx_invoiceHeaders_submissionId: index("idx_invoiceHeaders_submissionId").on(t.submissionId),
+  uniq_invoiceHeaders_invoiceNumber: uniqueIndex("uniq_invoiceHeaders_invoiceNumber").on(t.invoiceNumber),
+}));
+export type InvoiceHeader = typeof invoiceHeaders.$inferSelect;
+export type InsertInvoiceHeader = typeof invoiceHeaders.$inferInsert;
+
+export const invoiceLines = mysqlTable("invoiceLines", {
+  id: int("id").autoincrement().primaryKey(),
+  invoiceId: int("invoiceId").notNull().references(() => invoiceHeaders.id),
+  encounterId: int("encounterId").references(() => serviceEncounters.id),
+  authorizationId: int("authorizationId").references(() => serviceAuthorizations.id),
+  serviceCode: varchar("serviceCode", { length: 64 }),
+  serviceDate: timestamp("serviceDate"),
+  units: int("units").notNull().default(0),
+  rate: decimal("rate", { precision: 12, scale: 2 }),
+  expectedAmount: decimal("expectedAmount", { precision: 12, scale: 2 }),
+  /** Deterministic key that makes duplicate billing of the same service impossible. */
+  idempotencyKey: varchar("idempotencyKey", { length: 64 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => ({
+  uniq_invoiceLines_idempotencyKey: uniqueIndex("uniq_invoiceLines_idempotencyKey").on(t.idempotencyKey),
+  idx_invoiceLines_invoiceId: index("idx_invoiceLines_invoiceId").on(t.invoiceId),
+}));
+export type InvoiceLine = typeof invoiceLines.$inferSelect;
+export type InsertInvoiceLine = typeof invoiceLines.$inferInsert;
+
+export const invoiceSubmissions = mysqlTable("invoiceSubmissions", {
+  id: int("id").autoincrement().primaryKey(),
+  invoiceId: int("invoiceId").notNull().references(() => invoiceHeaders.id),
+  submittedAt: timestamp("submittedAt"),
+  submittedBy: int("submittedBy").references(() => users.id),
+  clearinghouseRef: varchar("clearinghouseRef", { length: 128 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type InvoiceSubmission = typeof invoiceSubmissions.$inferSelect;
+
+export const payments = mysqlTable("payments", {
+  id: int("id").autoincrement().primaryKey(),
+  invoiceId: int("invoiceId").references(() => invoiceHeaders.id),
+  submissionId: int("submissionId").notNull().references(() => submissions.id),
+  paidAmount: decimal("paidAmount", { precision: 12, scale: 2 }).notNull(),
+  paymentDate: timestamp("paymentDate"),
+  payerReference: varchar("payerReference", { length: 128 }),
+  createdBy: int("createdBy").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => ({ idx_payments_invoiceId: index("idx_payments_invoiceId").on(t.invoiceId) }));
+export type Payment = typeof payments.$inferSelect;
+export type InsertPayment = typeof payments.$inferInsert;
+
+export const paymentAllocations = mysqlTable("paymentAllocations", {
+  id: int("id").autoincrement().primaryKey(),
+  paymentId: int("paymentId").notNull().references(() => payments.id),
+  invoiceLineId: int("invoiceLineId").notNull().references(() => invoiceLines.id),
+  allocatedAmount: decimal("allocatedAmount", { precision: 12, scale: 2 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type PaymentAllocation = typeof paymentAllocations.$inferSelect;
+
+export const denials = mysqlTable("denials", {
+  id: int("id").autoincrement().primaryKey(),
+  invoiceId: int("invoiceId").references(() => invoiceHeaders.id),
+  invoiceLineId: int("invoiceLineId").references(() => invoiceLines.id),
+  denialCode: varchar("denialCode", { length: 64 }),
+  denialReason: text("denialReason"),
+  appealStatus: mysqlEnum("appealStatus", ["none", "appealed", "overturned", "upheld"]).notNull().default("none"),
+  createdBy: int("createdBy").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type Denial = typeof denials.$inferSelect;
+
+export const adjustments = mysqlTable("adjustments", {
+  id: int("id").autoincrement().primaryKey(),
+  invoiceId: int("invoiceId").references(() => invoiceHeaders.id),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  reason: text("reason"),
+  createdBy: int("createdBy").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type Adjustment = typeof adjustments.$inferSelect;
+
+export const recoupments = mysqlTable("recoupments", {
+  id: int("id").autoincrement().primaryKey(),
+  invoiceId: int("invoiceId").references(() => invoiceHeaders.id),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  reason: text("reason"),
+  recoupedAt: timestamp("recoupedAt"),
+  createdBy: int("createdBy").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type Recoupment = typeof recoupments.$inferSelect;
+
+export const billingHolds = mysqlTable("billingHolds", {
+  id: int("id").autoincrement().primaryKey(),
+  submissionId: int("submissionId").references(() => submissions.id),
+  invoiceId: int("invoiceId").references(() => invoiceHeaders.id),
+  reason: text("reason").notNull(),
+  active: boolean("active").notNull().default(true),
+  placedBy: int("placedBy").references(() => users.id),
+  releasedBy: int("releasedBy").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  releasedAt: timestamp("releasedAt"),
+}, (t) => ({ idx_billingHolds_submissionId: index("idx_billingHolds_submissionId").on(t.submissionId) }));
+export type BillingHold = typeof billingHolds.$inferSelect;
+
+// ─── Self-audit & CAPA ───────────────────────────────────────────────────────
+export const audits = mysqlTable("audits", {
+  id: int("id").autoincrement().primaryKey(),
+  title: varchar("title", { length: 256 }).notNull(),
+  auditType: varchar("auditType", { length: 64 }).notNull(),
+  status: mysqlEnum("status", ["planning", "fieldwork", "review", "closed"]).notNull().default("planning"),
+  periodStart: timestamp("periodStart"),
+  periodEnd: timestamp("periodEnd"),
+  leadAuditorId: int("leadAuditorId").references(() => users.id),
+  recordStatus: mysqlEnum("recordStatus", ["active", "archived", "voided", "superseded"]).notNull().default("active"),
+  version: int("version").notNull().default(1),
+  createdBy: int("createdBy").references(() => users.id),
+  closedBy: int("closedBy").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type Audit = typeof audits.$inferSelect;
+export type InsertAudit = typeof audits.$inferInsert;
+
+export const auditScopes = mysqlTable("auditScopes", {
+  id: int("id").autoincrement().primaryKey(),
+  auditId: int("auditId").notNull().references(() => audits.id),
+  description: text("description"),
+  requirementVersionId: int("requirementVersionId").references(() => requirementVersions.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type AuditScope = typeof auditScopes.$inferSelect;
+
+export const auditPopulations = mysqlTable("auditPopulations", {
+  id: int("id").autoincrement().primaryKey(),
+  auditId: int("auditId").notNull().references(() => audits.id),
+  description: varchar("description", { length: 256 }),
+  totalCount: int("totalCount").notNull().default(0),
+  totalAmount: decimal("totalAmount", { precision: 14, scale: 2 }),
+  /** Preserved snapshot of the population (JSON list of ids/keys) at selection time. */
+  snapshot: json("snapshot"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type AuditPopulation = typeof auditPopulations.$inferSelect;
+
+export const auditSamples = mysqlTable("auditSamples", {
+  id: int("id").autoincrement().primaryKey(),
+  auditId: int("auditId").notNull().references(() => audits.id),
+  populationId: int("populationId").notNull().references(() => auditPopulations.id),
+  method: mysqlEnum("method", ["full_population", "random", "stratified", "risk_based", "dollar_based", "judgmental"]).notNull(),
+  seed: int("seed"),
+  size: int("size").notNull().default(0),
+  selectionDate: timestamp("selectionDate").defaultNow().notNull(),
+  /** Immutable once set: the selected ids and excluded ids + reasons. */
+  selectedIds: json("selectedIds"),
+  excludedIds: json("excludedIds"),
+  exclusionReasons: json("exclusionReasons"),
+  createdBy: int("createdBy").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type AuditSample = typeof auditSamples.$inferSelect;
+export type InsertAuditSample = typeof auditSamples.$inferInsert;
+
+export const auditTests = mysqlTable("auditTests", {
+  id: int("id").autoincrement().primaryKey(),
+  auditId: int("auditId").notNull().references(() => audits.id),
+  sampleId: int("sampleId").references(() => auditSamples.id),
+  sampleItemId: varchar("sampleItemId", { length: 64 }),
+  requirementVersionId: int("requirementVersionId").references(() => requirementVersions.id),
+  result: mysqlEnum("result", ["pass", "fail", "observation", "not_applicable", "insufficient_evidence", "pending_clarification"]).notNull().default("pending_clarification"),
+  financialExposure: decimal("financialExposure", { precision: 12, scale: 2 }),
+  note: text("note"),
+  testedBy: int("testedBy").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => ({ idx_auditTests_auditId: index("idx_auditTests_auditId").on(t.auditId) }));
+export type AuditTest = typeof auditTests.$inferSelect;
+export type InsertAuditTest = typeof auditTests.$inferInsert;
+
+export const auditWorkpapers = mysqlTable("auditWorkpapers", {
+  id: int("id").autoincrement().primaryKey(),
+  auditId: int("auditId").notNull().references(() => audits.id),
+  title: varchar("title", { length: 256 }),
+  documentId: int("documentId").references(() => complianceDocuments.id),
+  createdBy: int("createdBy").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type AuditWorkpaper = typeof auditWorkpapers.$inferSelect;
+
+export const auditEvidence = mysqlTable("auditEvidence", {
+  id: int("id").autoincrement().primaryKey(),
+  auditTestId: int("auditTestId").notNull().references(() => auditTests.id),
+  documentId: int("documentId").references(() => complianceDocuments.id),
+  note: text("note"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type AuditEvidence = typeof auditEvidence.$inferSelect;
+
+export const auditFindings = mysqlTable("auditFindings", {
+  id: int("id").autoincrement().primaryKey(),
+  findingNumber: varchar("findingNumber", { length: 64 }),
+  auditId: int("auditId").notNull().references(() => audits.id),
+  submissionId: int("submissionId").references(() => submissions.id),
+  requirementVersionId: int("requirementVersionId").references(() => requirementVersions.id),
+  conditionFound: text("conditionFound"),
+  expectedCondition: text("expectedCondition"),
+  cause: text("cause"),
+  effect: text("effect"),
+  risk: mysqlEnum("risk", ["low", "medium", "high", "critical"]).notNull().default("medium"),
+  financialExposure: decimal("financialExposure", { precision: 12, scale: 2 }),
+  repeatFinding: boolean("repeatFinding").notNull().default(false),
+  responsibleOwnerId: int("responsibleOwnerId").references(() => users.id),
+  state: mysqlEnum("state", ["open", "management_response", "corrective_action", "follow_up", "closed", "reopened"]).notNull().default("open"),
+  dueDate: timestamp("dueDate"),
+  closureApprovedBy: int("closureApprovedBy").references(() => users.id),
+  reopenCount: int("reopenCount").notNull().default(0),
+  recordStatus: mysqlEnum("recordStatus", ["active", "archived", "voided", "superseded"]).notNull().default("active"),
+  version: int("version").notNull().default(1),
+  createdBy: int("createdBy").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => ({ idx_auditFindings_auditId: index("idx_auditFindings_auditId").on(t.auditId) }));
+export type AuditFinding = typeof auditFindings.$inferSelect;
+export type InsertAuditFinding = typeof auditFindings.$inferInsert;
+
+export const managementResponses = mysqlTable("managementResponses", {
+  id: int("id").autoincrement().primaryKey(),
+  findingId: int("findingId").notNull().references(() => auditFindings.id),
+  response: text("response").notNull(),
+  respondedBy: int("respondedBy").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ManagementResponse = typeof managementResponses.$inferSelect;
+
+export const correctiveActions = mysqlTable("correctiveActions", {
+  id: int("id").autoincrement().primaryKey(),
+  findingId: int("findingId").notNull().references(() => auditFindings.id),
+  immediateCorrection: text("immediateCorrection"),
+  rootCauseAnalysis: text("rootCauseAnalysis"),
+  correctiveAction: text("correctiveAction"),
+  preventiveAction: text("preventiveAction"),
+  dueDate: timestamp("dueDate"),
+  completed: boolean("completed").notNull().default(false),
+  completedAt: timestamp("completedAt"),
+  ownerId: int("ownerId").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => ({ idx_correctiveActions_findingId: index("idx_correctiveActions_findingId").on(t.findingId) }));
+export type CorrectiveAction = typeof correctiveActions.$inferSelect;
+
+export const correctiveActionEvidence = mysqlTable("correctiveActionEvidence", {
+  id: int("id").autoincrement().primaryKey(),
+  correctiveActionId: int("correctiveActionId").notNull().references(() => correctiveActions.id),
+  documentId: int("documentId").references(() => complianceDocuments.id),
+  note: text("note"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type CorrectiveActionEvidence = typeof correctiveActionEvidence.$inferSelect;
+
+export const followUpTests = mysqlTable("followUpTests", {
+  id: int("id").autoincrement().primaryKey(),
+  findingId: int("findingId").notNull().references(() => auditFindings.id),
+  result: mysqlEnum("result", ["pass", "fail", "observation", "not_applicable", "insufficient_evidence", "pending_clarification"]).notNull().default("pending_clarification"),
+  testedBy: int("testedBy").references(() => users.id),
+  note: text("note"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => ({ idx_followUpTests_findingId: index("idx_followUpTests_findingId").on(t.findingId) }));
+export type FollowUpTest = typeof followUpTests.$inferSelect;
+
+export const auditApprovals = mysqlTable("auditApprovals", {
+  id: int("id").autoincrement().primaryKey(),
+  auditId: int("auditId").notNull().references(() => audits.id),
+  approverId: int("approverId").references(() => users.id),
+  approvalType: varchar("approvalType", { length: 64 }).notNull(),
+  note: text("note"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type AuditApproval = typeof auditApprovals.$inferSelect;
+
+// ─── Overpayments (restricted; advisory only) ────────────────────────────────
+export const overpaymentCases = mysqlTable("overpaymentCases", {
+  id: int("id").autoincrement().primaryKey(),
+  discoveryDate: timestamp("discoveryDate"),
+  discoverySource: varchar("discoverySource", { length: 256 }),
+  periodStart: timestamp("periodStart"),
+  periodEnd: timestamp("periodEnd"),
+  preliminaryAmount: decimal("preliminaryAmount", { precision: 14, scale: 2 }),
+  finalAmount: decimal("finalAmount", { precision: 14, scale: 2 }),
+  calculationMethodology: text("calculationMethodology"),
+  rootCause: text("rootCause"),
+  legalReviewStatus: mysqlEnum("legalReviewStatus", ["not_started", "in_review", "complete"]).notNull().default("not_started"),
+  complianceReviewStatus: mysqlEnum("complianceReviewStatus", ["not_started", "in_review", "complete"]).notNull().default("not_started"),
+  repaymentDeadline: timestamp("repaymentDeadline"),
+  selfDisclosureEvaluation: text("selfDisclosureEvaluation"),
+  status: mysqlEnum("status", ["open", "under_review", "resolved", "closed"]).notNull().default("open"),
+  recordStatus: mysqlEnum("recordStatus", ["active", "archived", "voided", "superseded"]).notNull().default("active"),
+  version: int("version").notNull().default(1),
+  createdBy: int("createdBy").references(() => users.id),
+  closureApprovedBy: int("closureApprovedBy").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type OverpaymentCase = typeof overpaymentCases.$inferSelect;
+export type InsertOverpaymentCase = typeof overpaymentCases.$inferInsert;

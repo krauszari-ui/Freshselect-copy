@@ -42,61 +42,70 @@ export interface ConsumeUnitsParams {
 }
 
 /**
- * Transactionally consume units against an authorization. The row is locked
- * `FOR UPDATE` so concurrent consumers serialize; the pure guard prevents
- * over-consumption; the audit event commits atomically with the balance change.
- * Throws on failure so the surrounding transaction rolls back.
+ * Consume units against an authorization WITHIN an existing transaction. The row
+ * is locked `FOR UPDATE` so concurrent consumers serialize; the pure guard
+ * prevents over-consumption; the audit event is written on the same `tx` so it
+ * commits atomically with the balance change. Throws on failure so the caller's
+ * transaction rolls back.
  */
-export async function consumeUnits(params: ConsumeUnitsParams): Promise<ConsumeResult> {
-  return withTransaction(async (tx: Tx) => {
-    const rows = await tx
-      .select()
-      .from(serviceAuthorizations)
-      .where(eq(serviceAuthorizations.id, params.authorizationId))
-      .for("update");
-    const auth = rows[0];
-    if (!auth) throw new Error("AUTHORIZATION_NOT_FOUND");
-    if (auth.status !== "active") throw new Error(`AUTHORIZATION_NOT_ACTIVE:${auth.status}`);
+export async function consumeUnitsWithinTx(tx: Tx, params: ConsumeUnitsParams): Promise<ConsumeResult> {
+  const rows = await tx
+    .select()
+    .from(serviceAuthorizations)
+    .where(eq(serviceAuthorizations.id, params.authorizationId))
+    .for("update");
+  const auth = rows[0];
+  if (!auth) throw new Error("AUTHORIZATION_NOT_FOUND");
+  if (auth.status !== "active") throw new Error(`AUTHORIZATION_NOT_ACTIVE:${auth.status}`);
 
-    const result = consumeUnitsPure(auth.remainingUnits, params.requested);
-    if (!result.ok) {
-      // Record the denied attempt (success=false) so over-consumption attempts are visible.
-      await recordAuditEvent(tx, {
-        ...params.actor,
-        action: "authorization_units_consume_denied",
-        recordType: "serviceAuthorization",
-        recordId: auth.id,
-        clientId: auth.submissionId,
-        prevValue: { remainingUnits: auth.remainingUnits },
-        newValue: { requested: params.requested, reason: result.reason },
-        success: false,
-        reason: params.reason ?? null,
-      });
-      throw new Error(`UNIT_CONSUMPTION_FAILED:${result.reason}`);
-    }
-
-    await tx
-      .update(serviceAuthorizations)
-      .set({
-        remainingUnits: result.remaining,
-        status: result.exhausted ? "exhausted" : auth.status,
-        version: auth.version + 1,
-      })
-      .where(eq(serviceAuthorizations.id, auth.id));
-
+  const result = consumeUnitsPure(auth.remainingUnits, params.requested);
+  if (!result.ok) {
+    // Record the denied attempt (success=false) so over-consumption attempts are visible.
     await recordAuditEvent(tx, {
       ...params.actor,
-      action: "authorization_units_consumed",
+      action: "authorization_units_consume_denied",
       recordType: "serviceAuthorization",
       recordId: auth.id,
       clientId: auth.submissionId,
       prevValue: { remainingUnits: auth.remainingUnits },
-      newValue: { remainingUnits: result.remaining, consumed: params.requested, encounterId: params.encounterId ?? null },
+      newValue: { requested: params.requested, reason: result.reason },
+      success: false,
       reason: params.reason ?? null,
     });
+    throw new Error(`UNIT_CONSUMPTION_FAILED:${result.reason}`);
+  }
 
-    return result;
+  await tx
+    .update(serviceAuthorizations)
+    .set({
+      remainingUnits: result.remaining,
+      status: result.exhausted ? "exhausted" : auth.status,
+      version: auth.version + 1,
+    })
+    .where(eq(serviceAuthorizations.id, auth.id));
+
+  await recordAuditEvent(tx, {
+    ...params.actor,
+    action: "authorization_units_consumed",
+    recordType: "serviceAuthorization",
+    recordId: auth.id,
+    clientId: auth.submissionId,
+    prevValue: { remainingUnits: auth.remainingUnits },
+    newValue: { remainingUnits: result.remaining, consumed: params.requested, encounterId: params.encounterId ?? null },
+    reason: params.reason ?? null,
   });
+
+  return result;
+}
+
+/**
+ * Transactionally consume units against an authorization (opens its own
+ * transaction). The row is locked `FOR UPDATE` so concurrent consumers serialize;
+ * the pure guard prevents over-consumption; the audit event commits atomically
+ * with the balance change. Throws on failure.
+ */
+export async function consumeUnits(params: ConsumeUnitsParams): Promise<ConsumeResult> {
+  return withTransaction((tx: Tx) => consumeUnitsWithinTx(tx, params));
 }
 
 /** Is the authorization valid for a given service date (dates + status)? */

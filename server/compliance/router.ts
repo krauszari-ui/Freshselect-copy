@@ -8,101 +8,26 @@
  *  - and records tamper-evident audit events for material changes.
  */
 import { z } from "zod";
-import { TRPCError } from "@trpc/server";
-import { parse as parseCookieHeader } from "cookie";
-import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
-import type { User } from "../../drizzle/schema";
-import { getSubmissionById } from "../db";
+import { publicProcedure, router } from "../_core/trpc";
 import { requireDb } from "./db";
-import {
-  userComplianceRoles, complianceRoles as complianceRolesTable,
-} from "../../drizzle/schema";
-import { eq } from "drizzle-orm";
-import { PERMISSIONS, type Permission, type ComplianceRole } from "@shared/compliance/constants";
-import { hasPermission } from "./rbac";
-import { isComplianceModuleEnabled, complianceFlagSnapshot } from "./flags";
+import { PERMISSIONS } from "@shared/compliance/constants";
+import { complianceFlagSnapshot } from "./flags";
 import * as store from "./store";
 import { consumeUnits } from "./authorizations";
 import { loadAuditChain, verifyAuditChain, getEventsForRecord } from "./audit";
-
-// ─── Actor + subject helpers ─────────────────────────────────────────────────
-const SESSION_ID_COOKIE = "admin_session_id";
-const IMPERSONATION_COOKIE = "impersonation_original_session";
-
-interface Ctx {
-  user: User;
-  req: { headers: { cookie?: string; "user-agent"?: string }; ip?: string; socket?: { remoteAddress?: string } };
-}
-
-function actorFromCtx(ctx: Ctx): store.Actor {
-  const cookies = parseCookieHeader(ctx.req.headers.cookie ?? "");
-  const ip = ctx.req.ip ?? ctx.req.socket?.remoteAddress ?? "unknown";
-  const actor: store.Actor = {
-    actorId: ctx.user.id,
-    actorName: ctx.user.name ?? ctx.user.email ?? "Staff",
-    actorRole: ctx.user.role,
-    orgId: ctx.user.orgId ?? null,
-    sessionId: cookies[SESSION_ID_COOKIE] ?? null,
-    originalActorId: cookies[IMPERSONATION_COOKIE] ? ctx.user.id : null,
-    ip,
-    userAgent: ctx.req.headers["user-agent"] ?? null,
-  };
-  return actor;
-}
-
-/** Load the user's normalized compliance-role keys (best-effort). */
-async function loadComplianceRoles(userId: number): Promise<ComplianceRole[]> {
-  try {
-    const db = await requireDb();
-    const rows = await db
-      .select({ key: complianceRolesTable.key })
-      .from(userComplianceRoles)
-      .innerJoin(complianceRolesTable, eq(userComplianceRoles.roleId, complianceRolesTable.id))
-      .where(eq(userComplianceRoles.userId, userId));
-    return rows.map((r) => r.key as ComplianceRole);
-  } catch {
-    return [];
-  }
-}
-
-/** Build a procedure that requires the compliance module + a specific permission. */
-function permProcedure(perm: Permission) {
-  return protectedProcedure.use(async ({ ctx, next }) => {
-    if (!isComplianceModuleEnabled()) {
-      throw new TRPCError({ code: "FORBIDDEN", message: "Compliance module is not enabled." });
-    }
-    const complianceRoleKeys = await loadComplianceRoles(ctx.user.id);
-    if (!hasPermission({ role: ctx.user.role, complianceRoles: complianceRoleKeys }, perm)) {
-      throw new TRPCError({ code: "FORBIDDEN", message: `Missing permission: ${perm}` });
-    }
-    return next();
-  });
-}
-
-/**
- * Per-client access scoping. Internal staff (admin/super_admin/worker/viewer)
- * and holders of compliance roles see all clients; an assessor may only touch a
- * client assigned to them or referred to their org. Defends against cross-client
- * IDOR by resolving the submission server-side.
- */
-async function assertClientAccess(user: User, submissionId: number): Promise<void> {
-  const submission = await getSubmissionById(submissionId);
-  if (!submission) throw new TRPCError({ code: "NOT_FOUND", message: "Client not found" });
-  if (user.role === "assessor") {
-    const assigned = submission.assessorId === user.id;
-    const orgMatch = submission.referredOrgId != null && submission.referredOrgId === user.orgId;
-    if (!assigned && !orgMatch) {
-      throw new TRPCError({ code: "FORBIDDEN", message: "Not assigned to this client" });
-    }
-  }
-}
-
-// ─── Input schemas ───────────────────────────────────────────────────────────
-const submissionIdInput = z.object({ submissionId: z.number().int().positive() });
+import { permProcedure, actorFromCtx, assertClientAccess, submissionIdInput } from "./procedures";
+import { encountersRouter, billingRouter, auditsRouter, nutritionRouter, overpaymentsRouter } from "./routerOps";
 
 export const complianceRouter = router({
   /** Public: flag snapshot so the UI matches the server. */
   flags: publicProcedure.query(() => complianceFlagSnapshot()),
+
+  // Phase 3 sub-routers (service delivery, billing, self-audit/CAPA, nutrition, overpayments).
+  encounters: encountersRouter,
+  billing: billingRouter,
+  audits: auditsRouter,
+  nutrition: nutritionRouter,
+  overpayments: overpaymentsRouter,
 
   readiness: router({
     get: permProcedure(PERMISSIONS.READINESS_VIEW).input(submissionIdInput).query(async ({ input, ctx }) => {
