@@ -39,6 +39,8 @@ export interface ConsumeUnitsParams {
   actor: Pick<AuditEventInput, "actorId" | "actorName" | "actorRole" | "sessionId" | "ip" | "requestId">;
   reason?: string;
   encounterId?: number | null;
+  /** IDOR guard: when set, the authorization must belong to this client. */
+  expectedSubmissionId?: number | null;
 }
 
 /**
@@ -56,6 +58,10 @@ export async function consumeUnitsWithinTx(tx: Tx, params: ConsumeUnitsParams): 
     .for("update");
   const auth = rows[0];
   if (!auth) throw new Error("AUTHORIZATION_NOT_FOUND");
+  // IDOR guard: the authorization must belong to the client the caller was scoped to.
+  if (params.expectedSubmissionId != null && auth.submissionId !== params.expectedSubmissionId) {
+    throw new Error("AUTHORIZATION_NOT_FOUND");
+  }
   if (auth.status !== "active") throw new Error(`AUTHORIZATION_NOT_ACTIVE:${auth.status}`);
 
   const result = consumeUnitsPure(auth.remainingUnits, params.requested);

@@ -47,6 +47,7 @@ export interface AuditEventInput {
 export function canonicalizeEvent(evt: AuditEventInput, createdAtIso: string): string {
   const payload: Record<string, unknown> = {
     actorId: evt.actorId ?? null,
+    actorName: evt.actorName ?? null,
     originalActorId: evt.originalActorId ?? null,
     actorRole: evt.actorRole ?? null,
     orgId: evt.orgId ?? null,
@@ -58,6 +59,13 @@ export function canonicalizeEvent(evt: AuditEventInput, createdAtIso: string): s
     newValue: evt.newValue ?? null,
     reason: evt.reason ?? null,
     approvalId: evt.approvalId ?? null,
+    // Attribution / forensic fields are covered by the hash so they are
+    // tamper-evident too (an edit to who/where/which-session breaks verification).
+    requestId: evt.requestId ?? null,
+    sessionId: evt.sessionId ?? null,
+    correlationId: evt.correlationId ?? null,
+    ip: evt.ip ?? null,
+    userAgent: evt.userAgent ?? null,
     success: evt.success ?? true,
     createdAt: createdAtIso,
   };
@@ -181,6 +189,7 @@ export function verifyAuditChain(events: AuditEvent[]): ChainVerificationResult 
     const canonical = canonicalizeEvent(
       {
         actorId: e.actorId,
+        actorName: e.actorName,
         originalActorId: e.originalActorId,
         actorRole: e.actorRole,
         orgId: e.orgId,
@@ -192,6 +201,11 @@ export function verifyAuditChain(events: AuditEvent[]): ChainVerificationResult 
         newValue: e.newValue,
         reason: e.reason,
         approvalId: e.approvalId,
+        requestId: e.requestId,
+        sessionId: e.sessionId,
+        correlationId: e.correlationId,
+        ip: e.ip,
+        userAgent: e.userAgent,
         success: e.success,
       },
       e.createdAt instanceof Date ? e.createdAt.toISOString() : new Date(e.createdAt).toISOString(),

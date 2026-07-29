@@ -1380,9 +1380,15 @@ export const payments = mysqlTable("payments", {
   paidAmount: decimal("paidAmount", { precision: 12, scale: 2 }).notNull(),
   paymentDate: timestamp("paymentDate"),
   payerReference: varchar("payerReference", { length: 128 }),
+  /** Optional caller/payer-supplied idempotency key; unique when present so a
+   * retried payment callback cannot double-insert (NULLs are allowed to repeat). */
+  idempotencyKey: varchar("idempotencyKey", { length: 128 }),
   createdBy: int("createdBy").references(() => users.id),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-}, (t) => ({ idx_payments_invoiceId: index("idx_payments_invoiceId").on(t.invoiceId) }));
+}, (t) => ({
+  idx_payments_invoiceId: index("idx_payments_invoiceId").on(t.invoiceId),
+  uniq_payments_idempotencyKey: uniqueIndex("uniq_payments_idempotencyKey").on(t.idempotencyKey),
+}));
 export type Payment = typeof payments.$inferSelect;
 export type InsertPayment = typeof payments.$inferInsert;
 

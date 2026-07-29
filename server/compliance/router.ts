@@ -114,7 +114,7 @@ export const complianceRouter = router({
       reason: z.string().max(2000).optional(),
     })).mutation(async ({ input, ctx }) => {
       await assertClientAccess(ctx.user, input.submissionId);
-      return store.updateReferralStatus(actorFromCtx(ctx), input.referralId, input.status, input.reason);
+      return store.updateReferralStatus(actorFromCtx(ctx), input.referralId, input.submissionId, input.status, input.reason);
     }),
   }),
 
@@ -156,6 +156,7 @@ export const complianceRouter = router({
         authorizationId: input.authorizationId,
         requested: input.units,
         reason: input.reason,
+        expectedSubmissionId: input.submissionId,
         actor: { actorId: actor.actorId, actorName: actor.actorName, actorRole: actor.actorRole, sessionId: actor.sessionId, ip: actor.ip, requestId: actor.requestId },
       });
     }),
@@ -207,7 +208,7 @@ export const complianceRouter = router({
       status: z.enum(["pending", "in_progress", "satisfied", "failed", "waived", "not_applicable"]),
     })).mutation(async ({ input, ctx }) => {
       await assertClientAccess(ctx.user, input.submissionId);
-      return store.setAssignmentStatus(actorFromCtx(ctx), input.assignmentId, input.status);
+      return store.setAssignmentStatus(actorFromCtx(ctx), input.assignmentId, input.submissionId, input.status);
     }),
   }),
 

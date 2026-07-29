@@ -95,4 +95,17 @@ describe("audit hash chain", () => {
     const canonical = canonicalizeEvent({ action: "x", recordType: "y" }, "2026-01-01T00:00:00.000Z");
     expect(computeEventHash(canonical, null)).not.toBe(computeEventHash(canonical, "abc"));
   });
+
+  it("attribution/forensic fields are tamper-evident (actorName, ip, sessionId)", () => {
+    const chain = buildChain(4);
+    // actorName is covered by the hash → editing it breaks verification.
+    const nameTampered = chain.map((e, i) => (i === 1 ? { ...e, actorName: "Mallory" } : e));
+    expect(verifyAuditChain(nameTampered).ok).toBe(false);
+    // ip is covered too.
+    const ipTampered = chain.map((e, i) => (i === 2 ? { ...e, ip: "10.0.0.9" } : e));
+    expect(verifyAuditChain(ipTampered).ok).toBe(false);
+    // sessionId is covered too.
+    const sessionTampered = chain.map((e, i) => (i === 0 ? { ...e, sessionId: "forged" } : e));
+    expect(verifyAuditChain(sessionTampered).ok).toBe(false);
+  });
 });

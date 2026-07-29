@@ -40,7 +40,7 @@ export const encountersRouter = router({
     reason: z.string().max(2000).optional(),
   })).mutation(async ({ input, ctx }) => {
     await assertClientAccess(ctx.user, input.submissionId);
-    return ops.transitionEncounter(actorFromCtx(ctx), input.encounterId, input.to, { hasApproval: input.hasApproval, reason: input.reason });
+    return ops.transitionEncounter(actorFromCtx(ctx), input.encounterId, input.submissionId, input.to, { hasApproval: input.hasApproval, reason: input.reason });
   }),
   recordDelivery: permProcedure(PERMISSIONS.SERVICE_MANAGE).input(z.object({
     encounterId: z.number().int().positive(),
@@ -85,7 +85,7 @@ export const billingRouter = router({
     submissionId: z.number().int().positive(),
   })).mutation(async ({ input, ctx }) => {
     await assertClientAccess(ctx.user, input.submissionId);
-    return ops.approveInvoice(actorFromCtx(ctx), input.invoiceId);
+    return ops.approveInvoice(actorFromCtx(ctx), input.invoiceId, input.submissionId);
   }),
   recordPayment: permProcedure(PERMISSIONS.BILLING_MANAGE).input(z.object({
     invoiceId: z.number().int().positive(),
@@ -93,6 +93,7 @@ export const billingRouter = router({
     paidAmount: money,
     paymentDate: z.coerce.date().optional(),
     payerReference: z.string().max(128).optional(),
+    idempotencyKey: z.string().max(128).optional(),
   })).mutation(async ({ input, ctx }) => {
     await assertClientAccess(ctx.user, input.submissionId);
     return ops.recordPayment(actorFromCtx(ctx), input);

@@ -20,8 +20,9 @@ import {
   requirementExceptions, type RequirementException,
   complianceReadiness, type ComplianceReadiness,
 } from "../../drizzle/schema";
+import { TRPCError } from "@trpc/server";
 import { recordAuditEvent, type AuditEventInput } from "./audit";
-import { requireDb, withTransaction, type Tx } from "./db";
+import { requireDb, withTransaction, type Tx, type Queryer } from "./db";
 import { computeReadiness, type ReadinessInput } from "./readiness";
 import { requirementApplies, selectEffectiveVersion, retroactiveApplicationAllowed, type EvaluationContext } from "./requirements";
 import { canApproveException } from "./gates";
@@ -104,12 +105,14 @@ export async function createReferral(
 export async function updateReferralStatus(
   actor: Actor,
   referralId: number,
+  submissionId: number,
   status: ScnReferral["referralStatus"],
   reason?: string,
 ): Promise<ScnReferral> {
   return withTransaction(async (tx) => {
     const [prev] = await tx.select().from(scnReferrals).where(eq(scnReferrals.id, referralId)).for("update");
-    if (!prev) throw new Error("REFERRAL_NOT_FOUND");
+    // IDOR guard: the referral must belong to the client the caller was authorized for.
+    if (!prev || prev.submissionId !== submissionId) throw new TRPCError({ code: "NOT_FOUND", message: "Referral not found" });
     await tx.update(scnReferrals)
       .set({ referralStatus: status, rejectionReason: status === "rejected" ? reason ?? null : prev.rejectionReason, acceptanceDate: status === "accepted" ? new Date() : prev.acceptanceDate, version: prev.version + 1 })
       .where(eq(scnReferrals.id, referralId));
@@ -221,11 +224,13 @@ export async function listAssignmentsBySubmission(submissionId: number): Promise
 export async function setAssignmentStatus(
   actor: Actor,
   assignmentId: number,
+  submissionId: number,
   status: RequirementAssignment["status"],
 ): Promise<RequirementAssignment> {
   return withTransaction(async (tx) => {
     const [prev] = await tx.select().from(requirementAssignments).where(eq(requirementAssignments.id, assignmentId)).for("update");
-    if (!prev) throw new Error("ASSIGNMENT_NOT_FOUND");
+    // IDOR guard: the assignment must belong to the authorized client.
+    if (!prev || prev.submissionId !== submissionId) throw new TRPCError({ code: "NOT_FOUND", message: "Assignment not found" });
     await tx.update(requirementAssignments)
       .set({ status, satisfiedAt: status === "satisfied" ? new Date() : prev.satisfiedAt, version: prev.version + 1 })
       .where(eq(requirementAssignments.id, assignmentId));
@@ -287,8 +292,8 @@ export async function approveException(actor: Actor, exceptionId: number): Promi
 }
 
 // ─── Readiness (derived; recomputed & cached) ────────────────────────────────
-export async function gatherReadinessFacts(submissionId: number): Promise<ReadinessInput> {
-  const db = await requireDb();
+export async function gatherReadinessFacts(submissionId: number, q?: Queryer): Promise<ReadinessInput> {
+  const db = q ?? (await requireDb());
   const [submission] = await db.select().from(submissions).where(eq(submissions.id, submissionId));
   const now = new Date();
 
@@ -328,24 +333,25 @@ export async function gatherReadinessFacts(submissionId: number): Promise<Readin
 }
 
 export async function recomputeReadiness(actor: Actor, submissionId: number): Promise<{ status: ReadinessStatus; blockingReasons: string[] }> {
-  const facts = await gatherReadinessFacts(submissionId);
-  const result = computeReadiness(facts);
-  await withTransaction(async (tx: Tx) => {
-    const [existing] = await tx.select().from(complianceReadiness).where(eq(complianceReadiness.submissionId, submissionId));
-    if (existing) {
-      await tx.update(complianceReadiness)
-        .set({ status: result.status, blockingReasons: result.blockingReasons, computedAt: new Date() })
-        .where(eq(complianceReadiness.submissionId, submissionId));
-    } else {
-      await tx.insert(complianceReadiness).values({ submissionId, status: result.status, blockingReasons: result.blockingReasons });
-    }
+  // Lock the (always-present) submission row so concurrent recomputes serialize —
+  // the facts are gathered INSIDE the same critical section, so a stale
+  // computation can no longer overwrite a fresher one. The upsert is idempotent,
+  // eliminating the first-time insert/insert race.
+  return withTransaction(async (tx: Tx) => {
+    const [sub] = await tx.select().from(submissions).where(eq(submissions.id, submissionId)).for("update");
+    if (!sub) throw new TRPCError({ code: "NOT_FOUND", message: "Client not found" });
+    const facts = await gatherReadinessFacts(submissionId, tx);
+    const result = computeReadiness(facts);
+    await tx.insert(complianceReadiness)
+      .values({ submissionId, status: result.status, blockingReasons: result.blockingReasons })
+      .onDuplicateKeyUpdate({ set: { status: result.status, blockingReasons: result.blockingReasons, computedAt: new Date() } });
     // Readiness recomputation is itself an audited event (records the derived status).
     await recordAuditEvent(tx, {
       ...actor, action: "readiness_recomputed", recordType: "complianceReadiness", recordId: submissionId, clientId: submissionId,
       newValue: { status: result.status, blockingReasons: result.blockingReasons },
     });
+    return { status: result.status, blockingReasons: result.blockingReasons };
   });
-  return { status: result.status, blockingReasons: result.blockingReasons };
 }
 
 export async function getReadiness(submissionId: number): Promise<ComplianceReadiness | null> {

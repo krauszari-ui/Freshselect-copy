@@ -2,7 +2,7 @@
 import { describe, it, expect } from "vitest";
 import {
   mulberry32, seededShuffle, selectSample, verifySampleReproducible,
-  computeErrorRate, type PopulationItem,
+  computeErrorRate, sampleSelectionHash, type PopulationItem,
 } from "./sampling";
 
 function pop(n: number): PopulationItem[] {
@@ -72,6 +72,40 @@ describe("selectSample", () => {
     const s = selectSample(population, { method: "random", seed: 5, size: 4 });
     const tampered = { ...s, selectedIds: [...s.selectedIds.slice(1), 999] };
     expect(verifySampleReproducible(population, tampered)).toBe(false);
+  });
+
+  it("stratified NEVER drops the largest stratum (regression: quota over-allocation)", () => {
+    // A={1}, B={2}, C={3..10}; sizes 1,1,8. size=2 < number of strata (3).
+    const skewed: PopulationItem[] = [
+      { id: 1, stratum: "A" }, { id: 2, stratum: "B" },
+      ...Array.from({ length: 8 }, (_, i) => ({ id: i + 3, stratum: "C" })),
+    ];
+    const s = selectSample(skewed, { method: "stratified", seed: 3, size: 2 });
+    // Every stratum must be represented — C (80% of the population) cannot be excluded.
+    const strataOf = (ids: number[]) => new Set(ids.map((id) => (id <= 1 ? "A" : id === 2 ? "B" : "C")));
+    expect(strataOf(s.selectedIds).has("C")).toBe(true);
+    expect(strataOf(s.selectedIds)).toEqual(new Set(["A", "B", "C"]));
+    expect(verifySampleReproducible(skewed, s)).toBe(true);
+  });
+});
+
+describe("judgmental sample tamper-evidence via committed hash", () => {
+  const population = pop(20);
+  it("cannot self-verify without a committed hash (fail-safe)", () => {
+    const s = selectSample(population, { method: "judgmental", seed: 0, judgmentalIds: [3, 7, 11] });
+    expect(verifySampleReproducible(population, s)).toBe(false);
+  });
+  it("verifies against the committed hash and detects a swapped id", () => {
+    const s = selectSample(population, { method: "judgmental", seed: 0, judgmentalIds: [3, 7, 11] });
+    const committed = sampleSelectionHash(s.selectedIds);
+    expect(verifySampleReproducible(population, s, committed)).toBe(true);
+    // Swap a selected id for another in-population id → must be detected.
+    const tampered = { ...s, selectedIds: [3, 7, 12] };
+    expect(verifySampleReproducible(population, tampered, committed)).toBe(false);
+  });
+  it("sampleSelectionHash is order-independent and stable", () => {
+    expect(sampleSelectionHash([3, 1, 2])).toBe(sampleSelectionHash([1, 2, 3]));
+    expect(sampleSelectionHash([1, 2])).not.toBe(sampleSelectionHash([1, 3]));
   });
 });
 

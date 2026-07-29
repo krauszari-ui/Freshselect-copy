@@ -4,6 +4,7 @@
  * events for material changes; append-only history; state-machine enforcement.
  */
 import { and, desc, eq } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
 import {
   serviceEncounters, type ServiceEncounter, type InsertServiceEncounter,
   deliveries, serviceAmendments,
@@ -24,7 +25,8 @@ import { type Actor } from "./store";
 import { validateTransition, type EncounterState, hasSufficientProofOfDelivery, type PodMethod } from "./delivery";
 import { consumeUnitsWithinTx } from "./authorizations";
 import { computeLineExpectedAmount, computeInvoiceExpectedTotal, invoiceLineIdempotencyKey, validateInvoiceLine, reconcilePayment } from "./billing";
-import { selectSample, type PopulationItem, type SamplingMethod } from "./sampling";
+import { sumMoney } from "./money";
+import { selectSample, sampleSelectionHash, type PopulationItem, type SamplingMethod } from "./sampling";
 import { canCloseFinding, type TestResult } from "./capa";
 import { serviceAuthorizations } from "../../drizzle/schema";
 
@@ -45,10 +47,11 @@ export async function listEncounters(submissionId: number): Promise<ServiceEncou
 }
 
 /** Transition an encounter through the state machine (validated + audited). */
-export async function transitionEncounter(actor: Actor, encounterId: number, to: EncounterState, opts?: { hasApproval?: boolean; reason?: string }): Promise<ServiceEncounter> {
+export async function transitionEncounter(actor: Actor, encounterId: number, submissionId: number, to: EncounterState, opts?: { hasApproval?: boolean; reason?: string }): Promise<ServiceEncounter> {
   return withTransaction(async (tx) => {
     const [enc] = await tx.select().from(serviceEncounters).where(eq(serviceEncounters.id, encounterId)).for("update");
-    if (!enc) throw new Error("ENCOUNTER_NOT_FOUND");
+    // IDOR guard: the encounter must belong to the authorized client.
+    if (!enc || enc.submissionId !== submissionId) throw new TRPCError({ code: "NOT_FOUND", message: "Encounter not found" });
     const check = validateTransition(enc.state, to, opts?.hasApproval ?? false);
     if (!check.ok) {
       await recordAuditEvent(tx, { ...actor, action: "encounter_transition_denied", recordType: "serviceEncounter", recordId: encounterId, clientId: enc.submissionId, success: false, prevValue: { state: enc.state }, newValue: { to, reason: check.reason } });
@@ -63,6 +66,9 @@ export async function transitionEncounter(actor: Actor, encounterId: number, to:
 
 export async function recordDelivery(actor: Actor, data: { encounterId: number; submissionId: number; deliveryAddress?: string; deliveredAt?: Date; staffOrVendor?: string; podMethod?: PodMethod; signaturePresent?: boolean; photoPresent?: boolean; gpsPresent?: boolean; temperatureRecord?: string; status?: "delivered" | "failed" | "redelivered" }): Promise<{ id: number; podSufficient: boolean }> {
   return withTransaction(async (tx) => {
+    // IDOR guard: the target encounter must belong to the authorized client.
+    const [enc] = await tx.select().from(serviceEncounters).where(eq(serviceEncounters.id, data.encounterId));
+    if (!enc || enc.submissionId !== data.submissionId) throw new TRPCError({ code: "NOT_FOUND", message: "Encounter not found" });
     const inserted = await tx.insert(deliveries).values({
       encounterId: data.encounterId, deliveryAddress: data.deliveryAddress ?? null, deliveredAt: data.deliveredAt ?? null,
       staffOrVendor: data.staffOrVendor ?? null, podMethod: data.podMethod ?? null, temperatureRecord: data.temperatureRecord ?? null,
@@ -99,13 +105,20 @@ export async function createInvoice(actor: Actor, input: { submissionId: number;
       if (line.authorizationId != null) {
         const rows = await tx.select().from(serviceAuthorizations).where(eq(serviceAuthorizations.id, line.authorizationId)).for("update");
         auth = rows[0] ?? null;
+        // IDOR guard: the referenced authorization must belong to this client.
+        if (!auth || auth.submissionId !== input.submissionId) throw new TRPCError({ code: "NOT_FOUND", message: "Authorization not found" });
+      }
+      // IDOR guard: the referenced encounter must belong to this client.
+      if (line.encounterId != null) {
+        const [enc] = await tx.select().from(serviceEncounters).where(eq(serviceEncounters.id, line.encounterId));
+        if (!enc || enc.submissionId !== input.submissionId) throw new TRPCError({ code: "NOT_FOUND", message: "Encounter not found" });
       }
       const check = validateInvoiceLine({ units: line.units, serviceDate: line.serviceDate, authorization: auth ? { remainingUnits: auth.remainingUnits, startDate: auth.startDate, endDate: auth.endDate, status: auth.status } : null });
       if (!check.ok) throw new Error(`INVOICE_LINE_INVALID:${check.reason}`);
 
-      // Consume units atomically on the same transaction.
+      // Consume units atomically on the same transaction (scoped to this client).
       if (line.authorizationId != null) {
-        await consumeUnitsWithinTx(tx, { authorizationId: line.authorizationId, requested: line.units, actor, encounterId: line.encounterId ?? null, reason: "invoice_line" });
+        await consumeUnitsWithinTx(tx, { authorizationId: line.authorizationId, requested: line.units, actor, encounterId: line.encounterId ?? null, reason: "invoice_line", expectedSubmissionId: input.submissionId });
       }
 
       const idempotencyKey = invoiceLineIdempotencyKey({ submissionId: input.submissionId, encounterId: line.encounterId ?? null, serviceCode: line.serviceCode ?? null, serviceDate: line.serviceDate, units: line.units });
@@ -129,11 +142,18 @@ export async function createInvoice(actor: Actor, input: { submissionId: number;
 }
 
 /** Approve an invoice — separation of duties: approver must differ from creator. */
-export async function approveInvoice(actor: Actor, invoiceId: number): Promise<InvoiceHeader> {
+export async function approveInvoice(actor: Actor, invoiceId: number, submissionId: number): Promise<InvoiceHeader> {
   if (actor.actorId == null) throw new Error("ACTOR_REQUIRED");
   return withTransaction(async (tx) => {
     const [inv] = await tx.select().from(invoiceHeaders).where(eq(invoiceHeaders.id, invoiceId)).for("update");
-    if (!inv) throw new Error("INVOICE_NOT_FOUND");
+    // IDOR guard: the invoice must belong to the authorized client.
+    if (!inv || inv.submissionId !== submissionId) throw new TRPCError({ code: "NOT_FOUND", message: "Invoice not found" });
+    // State-machine guard: only a pre-approval invoice can be approved — a
+    // denied/paid/submitted/void/already-approved invoice cannot be flipped back.
+    if (inv.status !== "draft" && inv.status !== "validated") {
+      await recordAuditEvent(tx, { ...actor, action: "invoice_approval_denied", recordType: "invoiceHeader", recordId: invoiceId, clientId: inv.submissionId, success: false, prevValue: { status: inv.status }, reason: "invalid_status_for_approval" });
+      throw new Error(`INVOICE_NOT_APPROVABLE:${inv.status}`);
+    }
     if (inv.createdBy != null && inv.createdBy === actor.actorId) {
       await recordAuditEvent(tx, { ...actor, action: "invoice_approval_denied", recordType: "invoiceHeader", recordId: invoiceId, clientId: inv.submissionId, success: false, reason: "separation_of_duties" });
       throw new Error("SEPARATION_OF_DUTIES_VIOLATION");
@@ -145,15 +165,24 @@ export async function approveInvoice(actor: Actor, invoiceId: number): Promise<I
   });
 }
 
-export async function recordPayment(actor: Actor, data: { invoiceId: number; submissionId: number; paidAmount: string; paymentDate?: Date; payerReference?: string }): Promise<{ paymentId: number; status: string; variance: string }> {
+export async function recordPayment(actor: Actor, data: { invoiceId: number; submissionId: number; paidAmount: string; paymentDate?: Date; payerReference?: string; idempotencyKey?: string }): Promise<{ paymentId: number; status: string; variance: string; paidTotal: string }> {
   return withTransaction(async (tx) => {
     const [inv] = await tx.select().from(invoiceHeaders).where(eq(invoiceHeaders.id, data.invoiceId)).for("update");
-    if (!inv) throw new Error("INVOICE_NOT_FOUND");
-    const inserted = await tx.insert(payments).values({ invoiceId: data.invoiceId, submissionId: data.submissionId, paidAmount: data.paidAmount, paymentDate: data.paymentDate ?? new Date(), payerReference: data.payerReference ?? null, createdBy: actor.actorId ?? null }).$returningId();
-    const recon = reconcilePayment({ expected: inv.expectedTotal ?? "0", paid: data.paidAmount });
-    await tx.update(invoiceHeaders).set({ paidTotal: data.paidAmount, status: recon.status === "paid_in_full" ? "paid" : inv.status, reconciliationStatus: recon.status === "paid_in_full" ? "reconciled" : "partial", version: inv.version + 1 }).where(eq(invoiceHeaders.id, data.invoiceId));
-    await recordAuditEvent(tx, { ...actor, action: "payment_recorded", recordType: "payment", recordId: inserted[0].id, clientId: data.submissionId, newValue: { paidAmount: data.paidAmount, status: recon.status, variance: recon.variance } });
-    return { paymentId: inserted[0].id, status: recon.status, variance: recon.variance };
+    // IDOR guard: the invoice must belong to the authorized client.
+    if (!inv || inv.submissionId !== data.submissionId) throw new TRPCError({ code: "NOT_FOUND", message: "Invoice not found" });
+    if (inv.status === "void" || inv.status === "denied") throw new Error(`INVOICE_NOT_PAYABLE:${inv.status}`);
+    // Idempotency: a caller-supplied key (e.g. a payer/webhook reference) is unique
+    // per row; a retried callback with the same key throws ER_DUP_ENTRY and rolls
+    // back, so a duplicate payment is never recorded.
+    const inserted = await tx.insert(payments).values({ invoiceId: data.invoiceId, submissionId: data.submissionId, paidAmount: data.paidAmount, paymentDate: data.paymentDate ?? new Date(), payerReference: data.payerReference ?? null, idempotencyKey: data.idempotencyKey ?? null, createdBy: actor.actorId ?? null }).$returningId();
+    // Reconcile against the ACCUMULATED total of all payments for this invoice,
+    // not just this single payment (so partials correctly sum toward paid).
+    const allPaid = await tx.select().from(payments).where(eq(payments.invoiceId, data.invoiceId));
+    const paidTotal = sumMoney(allPaid.map((p) => p.paidAmount));
+    const recon = reconcilePayment({ expected: inv.expectedTotal ?? "0", paid: paidTotal });
+    await tx.update(invoiceHeaders).set({ paidTotal, status: recon.status === "paid_in_full" ? "paid" : inv.status, reconciliationStatus: recon.status === "paid_in_full" ? "reconciled" : "partial", version: inv.version + 1 }).where(eq(invoiceHeaders.id, data.invoiceId));
+    await recordAuditEvent(tx, { ...actor, action: "payment_recorded", recordType: "payment", recordId: inserted[0].id, clientId: data.submissionId, newValue: { paidAmount: data.paidAmount, paidTotal, status: recon.status, variance: recon.variance } });
+    return { paymentId: inserted[0].id, status: recon.status, variance: recon.variance, paidTotal };
   });
 }
 
@@ -162,8 +191,17 @@ export async function listInvoices(submissionId: number): Promise<InvoiceHeader[
   return db.select().from(invoiceHeaders).where(eq(invoiceHeaders.submissionId, submissionId)).orderBy(desc(invoiceHeaders.createdAt));
 }
 
+/** Load an invoice inside a tx and assert it belongs to the authorized client. */
+async function requireOwnedInvoice(tx: Tx, invoiceId: number, submissionId: number) {
+  const [inv] = await tx.select().from(invoiceHeaders).where(eq(invoiceHeaders.id, invoiceId)).for("update");
+  if (!inv || inv.submissionId !== submissionId) throw new TRPCError({ code: "NOT_FOUND", message: "Invoice not found" });
+  return inv;
+}
+
 export async function recordDenial(actor: Actor, data: { invoiceId: number; submissionId: number; denialCode?: string; denialReason?: string }): Promise<number> {
   return withTransaction(async (tx) => {
+    const inv = await requireOwnedInvoice(tx, data.invoiceId, data.submissionId);
+    if (inv.status === "paid") throw new Error("INVOICE_ALREADY_PAID");
     const inserted = await tx.insert(denials).values({ invoiceId: data.invoiceId, denialCode: data.denialCode ?? null, denialReason: data.denialReason ?? null, createdBy: actor.actorId ?? null }).$returningId();
     await tx.update(invoiceHeaders).set({ status: "denied" }).where(eq(invoiceHeaders.id, data.invoiceId));
     await recordAuditEvent(tx, { ...actor, action: "denial_recorded", recordType: "denial", recordId: inserted[0].id, clientId: data.submissionId, newValue: { denialCode: data.denialCode } });
@@ -173,6 +211,7 @@ export async function recordDenial(actor: Actor, data: { invoiceId: number; subm
 
 export async function recordAdjustment(actor: Actor, data: { invoiceId: number; submissionId: number; amount: string; reason?: string }): Promise<number> {
   return withTransaction(async (tx) => {
+    await requireOwnedInvoice(tx, data.invoiceId, data.submissionId);
     const inserted = await tx.insert(adjustments).values({ invoiceId: data.invoiceId, amount: data.amount, reason: data.reason ?? null, createdBy: actor.actorId ?? null }).$returningId();
     await recordAuditEvent(tx, { ...actor, action: "adjustment_recorded", recordType: "adjustment", recordId: inserted[0].id, clientId: data.submissionId, newValue: { amount: data.amount } });
     return inserted[0].id;
@@ -181,6 +220,7 @@ export async function recordAdjustment(actor: Actor, data: { invoiceId: number; 
 
 export async function recordRecoupment(actor: Actor, data: { invoiceId: number; submissionId: number; amount: string; reason?: string }): Promise<number> {
   return withTransaction(async (tx) => {
+    await requireOwnedInvoice(tx, data.invoiceId, data.submissionId);
     const inserted = await tx.insert(recoupments).values({ invoiceId: data.invoiceId, amount: data.amount, reason: data.reason ?? null, recoupedAt: new Date(), createdBy: actor.actorId ?? null }).$returningId();
     await recordAuditEvent(tx, { ...actor, action: "recoupment_recorded", recordType: "recoupment", recordId: inserted[0].id, clientId: data.submissionId, newValue: { amount: data.amount } });
     return inserted[0].id;
@@ -219,7 +259,10 @@ export async function createAuditSample(actor: Actor, data: { auditId: number; p
       exclusionReasons: (data.exclusionReasons ?? {}) as object, createdBy: actor.actorId ?? null,
     }).$returningId();
     const id = inserted[0].id;
-    await recordAuditEvent(tx, { ...actor, action: "audit_sample_selected", recordType: "auditSample", recordId: id, newValue: { method: data.method, seed: data.seed, selected: selection.selectedIds.length, population: data.population.length } });
+    // Commit the exact selection into the hash-chained audit event so a later edit
+    // of `auditSamples.selectedIds` (incl. a judgmental swap) is detectable and the
+    // commitment itself cannot be altered without breaking the chain.
+    await recordAuditEvent(tx, { ...actor, action: "audit_sample_selected", recordType: "auditSample", recordId: id, newValue: { method: data.method, seed: data.seed, selected: selection.selectedIds.length, population: data.population.length, selectedIdsHash: sampleSelectionHash(selection.selectedIds) } });
     const [row] = await tx.select().from(auditSamples).where(eq(auditSamples.id, id));
     return row;
   });

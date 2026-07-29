@@ -18,6 +18,7 @@ import {
   organizations, Organization, InsertOrganization,
   orgGroupMessages, OrgGroupMessage, InsertOrgGroupMessage,
   orgMessageReads, OrgMessageRead, InsertOrgMessageRead,
+  complianceDocuments,
 } from "../drizzle/schema";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -76,6 +77,22 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
     await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
   } catch (error) { console.error("[Database] Failed to upsert user:", error); throw error; }
+}
+
+/**
+ * Resolve a storage object key to its owning client (submission), checking both
+ * the legacy `documents.fileKey` and the new `complianceDocuments.objectKey`.
+ * Returns null when the key is not a tracked client document. Used by the storage
+ * proxy to authorize per-client file access rather than trusting the key alone.
+ */
+export async function resolveFileKeyOwnerSubmissionId(key: string): Promise<number | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const [doc] = await db.select({ submissionId: documents.submissionId }).from(documents).where(eq(documents.fileKey, key)).limit(1);
+  if (doc?.submissionId != null) return doc.submissionId;
+  const [cdoc] = await db.select({ submissionId: complianceDocuments.submissionId }).from(complianceDocuments).where(eq(complianceDocuments.objectKey, key)).limit(1);
+  if (cdoc?.submissionId != null) return cdoc.submissionId;
+  return null;
 }
 
 export async function getUserByOpenId(openId: string) {

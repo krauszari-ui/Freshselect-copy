@@ -31,6 +31,35 @@ export function registerStorageProxy(app: Express) {
       res.status(400).send("Invalid storage key");
       return;
     }
+
+    // PER-CLIENT SCOPING: the assessor role is restricted to its assigned/referred
+    // clients, so it must not be able to fetch another client's document just by
+    // knowing/guessing the object key. Resolve the key to its owning client and
+    // enforce the same access rule the tRPC layer uses; deny-by-default for keys
+    // that are not tracked client documents (so key obscurity is not the boundary).
+    if (user.role === "assessor") {
+      try {
+        const { resolveFileKeyOwnerSubmissionId, getSubmissionById } = await import("../db");
+        const ownerSubmissionId = await resolveFileKeyOwnerSubmissionId(key);
+        if (ownerSubmissionId == null) {
+          res.status(404).send("Not found");
+          return;
+        }
+        const submission = await getSubmissionById(ownerSubmissionId);
+        const allowed = !!submission && (
+          submission.assessorId === user.id ||
+          (submission.referredOrgId != null && submission.referredOrgId === user.orgId)
+        );
+        if (!allowed) {
+          res.status(403).send("Not authorized to access this document");
+          return;
+        }
+      } catch (e) {
+        console.error("[StorageProxy] scope check failed:", e);
+        res.status(500).send("Storage authorization error");
+        return;
+      }
+    }
     if (!ENV.forgeApiUrl || !ENV.forgeApiKey) {
       res.status(500).send("Storage proxy not configured");
       return;

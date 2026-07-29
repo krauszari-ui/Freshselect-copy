@@ -136,8 +136,8 @@ CREATE TABLE IF NOT EXISTS `invoiceSubmissions` (
 
 CREATE TABLE IF NOT EXISTS `payments` (
   `id` INT AUTO_INCREMENT PRIMARY KEY, `invoiceId` INT NULL, `submissionId` INT NOT NULL, `paidAmount` DECIMAL(12,2) NOT NULL,
-  `paymentDate` TIMESTAMP NULL, `payerReference` VARCHAR(128) NULL, `createdBy` INT NULL, `createdAt` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  INDEX `idx_payments_invoiceId` (`invoiceId`),
+  `paymentDate` TIMESTAMP NULL, `payerReference` VARCHAR(128) NULL, `idempotencyKey` VARCHAR(128) NULL, `createdBy` INT NULL, `createdAt` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_payments_invoiceId` (`invoiceId`), UNIQUE KEY `uniq_payments_idempotencyKey` (`idempotencyKey`),
   CONSTRAINT `fk_payments_invoice` FOREIGN KEY (`invoiceId`) REFERENCES `invoiceHeaders`(`id`),
   CONSTRAINT `fk_payments_submission` FOREIGN KEY (`submissionId`) REFERENCES `submissions`(`id`)
 );
