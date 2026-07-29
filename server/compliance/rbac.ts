@@ -1,0 +1,122 @@
+/**
+ * Normalized RBAC for the compliance module.
+ *
+ * The legacy app authorizes on a single `role` enum plus a `permissions` JSON
+ * blob. This module layers a normalized permission model on top WITHOUT breaking
+ * that: every legacy role maps to a concrete permission set, and normalized
+ * compliance roles (stored in `userComplianceRoles`) can grant additional
+ * permissions. Server middleware enforces these on every compliance procedure —
+ * never relying on the client to hide a button.
+ */
+import { PERMISSIONS, type Permission, type ComplianceRole } from "@shared/compliance/constants";
+
+const ALL_PERMISSIONS: Permission[] = Object.values(PERMISSIONS);
+
+/** Permissions a worker gets: operational manage, but no approvals/reveal/export. */
+const WORKER_PERMISSIONS: Permission[] = [
+  PERMISSIONS.COMPLIANCE_VIEW,
+  PERMISSIONS.ELIGIBILITY_VIEW, PERMISSIONS.ELIGIBILITY_MANAGE,
+  PERMISSIONS.REFERRAL_VIEW, PERMISSIONS.REFERRAL_MANAGE,
+  PERMISSIONS.AUTHORIZATION_VIEW, PERMISSIONS.AUTHORIZATION_MANAGE,
+  PERMISSIONS.REQUIREMENT_VIEW,
+  PERMISSIONS.READINESS_VIEW,
+  PERMISSIONS.DOCUMENT_VIEW, PERMISSIONS.DOCUMENT_MANAGE,
+  PERMISSIONS.EXCEPTION_REQUEST,
+];
+
+const VIEWER_PERMISSIONS: Permission[] = [
+  PERMISSIONS.COMPLIANCE_VIEW,
+  PERMISSIONS.ELIGIBILITY_VIEW, PERMISSIONS.REFERRAL_VIEW,
+  PERMISSIONS.AUTHORIZATION_VIEW, PERMISSIONS.REQUIREMENT_VIEW,
+  PERMISSIONS.READINESS_VIEW, PERMISSIONS.DOCUMENT_VIEW,
+];
+
+const ASSESSOR_PERMISSIONS: Permission[] = [
+  PERMISSIONS.COMPLIANCE_VIEW,
+  PERMISSIONS.ELIGIBILITY_VIEW, PERMISSIONS.REFERRAL_VIEW,
+  PERMISSIONS.AUTHORIZATION_VIEW,
+  PERMISSIONS.REQUIREMENT_VIEW, PERMISSIONS.REQUIREMENT_MANAGE,
+  PERMISSIONS.READINESS_VIEW, PERMISSIONS.DOCUMENT_VIEW,
+];
+
+/** Legacy role → base permission set. */
+const LEGACY_ROLE_PERMISSIONS: Record<string, Permission[]> = {
+  super_admin: ALL_PERMISSIONS,
+  admin: ALL_PERMISSIONS,
+  worker: WORKER_PERMISSIONS,
+  viewer: VIEWER_PERMISSIONS,
+  assessor: ASSESSOR_PERMISSIONS,
+  user: [],
+};
+
+/** Normalized compliance role → additional permissions. */
+const COMPLIANCE_ROLE_PERMISSIONS: Record<ComplianceRole, Permission[]> = {
+  compliance_officer: ALL_PERMISSIONS,
+  compliance_reviewer: [
+    PERMISSIONS.COMPLIANCE_VIEW, PERMISSIONS.COMPLIANCE_MANAGE,
+    PERMISSIONS.ELIGIBILITY_VIEW, PERMISSIONS.REFERRAL_VIEW,
+    PERMISSIONS.AUTHORIZATION_VIEW, PERMISSIONS.REQUIREMENT_VIEW, PERMISSIONS.REQUIREMENT_APPROVE,
+    PERMISSIONS.READINESS_VIEW, PERMISSIONS.EXCEPTION_APPROVE,
+    PERMISSIONS.DOCUMENT_VIEW, PERMISSIONS.AUDIT_VIEW,
+  ],
+  program_manager: [
+    PERMISSIONS.COMPLIANCE_VIEW, PERMISSIONS.ELIGIBILITY_VIEW, PERMISSIONS.REFERRAL_VIEW,
+    PERMISSIONS.AUTHORIZATION_VIEW, PERMISSIONS.REQUIREMENT_VIEW, PERMISSIONS.READINESS_VIEW,
+    PERMISSIONS.DOCUMENT_VIEW, PERMISSIONS.EXPORT,
+  ],
+  billing_specialist: [
+    PERMISSIONS.COMPLIANCE_VIEW, PERMISSIONS.AUTHORIZATION_VIEW,
+    PERMISSIONS.READINESS_VIEW, PERMISSIONS.DOCUMENT_VIEW, PERMISSIONS.MEDICAID_ID_REVEAL,
+  ],
+  clinical_reviewer: [
+    PERMISSIONS.COMPLIANCE_VIEW, PERMISSIONS.REQUIREMENT_VIEW, PERMISSIONS.REQUIREMENT_MANAGE,
+    PERMISSIONS.REQUIREMENT_APPROVE, PERMISSIONS.READINESS_VIEW, PERMISSIONS.DOCUMENT_VIEW,
+  ],
+  rdn_cdn: [
+    PERMISSIONS.COMPLIANCE_VIEW, PERMISSIONS.REQUIREMENT_VIEW, PERMISSIONS.REQUIREMENT_APPROVE,
+    PERMISSIONS.READINESS_VIEW, PERMISSIONS.DOCUMENT_VIEW,
+  ],
+  internal_auditor: [
+    PERMISSIONS.COMPLIANCE_VIEW, PERMISSIONS.ELIGIBILITY_VIEW, PERMISSIONS.REFERRAL_VIEW,
+    PERMISSIONS.AUTHORIZATION_VIEW, PERMISSIONS.REQUIREMENT_VIEW, PERMISSIONS.READINESS_VIEW,
+    PERMISSIONS.DOCUMENT_VIEW, PERMISSIONS.AUDIT_VIEW, PERMISSIONS.EXPORT,
+  ],
+  readonly_external_auditor: [
+    PERMISSIONS.COMPLIANCE_VIEW, PERMISSIONS.READINESS_VIEW, PERMISSIONS.DOCUMENT_VIEW, PERMISSIONS.AUDIT_VIEW,
+  ],
+  attorney: [
+    PERMISSIONS.COMPLIANCE_VIEW, PERMISSIONS.REQUIREMENT_VIEW, PERMISSIONS.READINESS_VIEW,
+    PERMISSIONS.DOCUMENT_VIEW, PERMISSIONS.AUDIT_VIEW,
+  ],
+  document_administrator: [
+    PERMISSIONS.COMPLIANCE_VIEW, PERMISSIONS.DOCUMENT_VIEW, PERMISSIONS.DOCUMENT_MANAGE,
+  ],
+};
+
+export interface PermissionSubject {
+  role: string;
+  complianceRoles?: ComplianceRole[];
+}
+
+/** Compute the effective permission set for a subject (pure, testable). */
+export function getEffectivePermissions(subject: PermissionSubject): Set<Permission> {
+  const perms = new Set<Permission>();
+  for (const p of LEGACY_ROLE_PERMISSIONS[subject.role] ?? []) perms.add(p);
+  for (const cr of subject.complianceRoles ?? []) {
+    for (const p of COMPLIANCE_ROLE_PERMISSIONS[cr] ?? []) perms.add(p);
+  }
+  return perms;
+}
+
+export function hasPermission(subject: PermissionSubject, needed: Permission): boolean {
+  return getEffectivePermissions(subject).has(needed);
+}
+
+/**
+ * Separation of duties: the same person must not both request and approve a
+ * high-risk action (e.g. an exception override). Returns true when the pairing
+ * is allowed.
+ */
+export function separationOfDutiesOk(requesterId: number, approverId: number): boolean {
+  return requesterId !== approverId;
+}

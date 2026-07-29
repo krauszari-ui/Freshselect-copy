@@ -1,7 +1,26 @@
 import type { Express } from "express";
 import { ENV } from "./env";
+import { sdk } from "./sdk";
+
 export function registerStorageProxy(app: Express) {
   app.get("/manus-storage/:key(*)", async (req, res) => {
+    // SECURITY FIX: this endpoint previously served ANY object key to ANYONE.
+    // Every file retrieval must now be authorization-aware: require a valid
+    // authenticated session before minting/redirecting to a signed URL. Public,
+    // unauthenticated file access through this proxy is no longer permitted.
+    const user = await sdk.authenticateRequest(req).catch(() => null);
+    if (!user) {
+      res.status(401).send("Authentication required");
+      return;
+    }
+    // Only internal staff / assessors may retrieve stored files here. Public
+    // ("user") accounts and unauthenticated callers are rejected.
+    const allowedRoles = new Set(["admin", "super_admin", "worker", "viewer", "assessor"]);
+    if (!allowedRoles.has(user.role)) {
+      res.status(403).send("Not authorized to access stored files");
+      return;
+    }
+
     const key = req.params.key;
     if (!key) {
       res.status(400).send("Missing storage key");

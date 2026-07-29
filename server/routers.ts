@@ -5,6 +5,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import { complianceRouter } from "./compliance/router";
 import {
   createSubmission, getAllSubmissions, getSubmissionById, getSubmissionStats,
   listAllUsers, listSubmissions, listWorkers, listStaffUsers, setUserRole,
@@ -186,6 +187,7 @@ const IMPERSONATION_COOKIE = "impersonation_original_session";
 
 export const appRouter = router({
   system: systemRouter,
+  compliance: complianceRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(async ({ ctx }) => {
