@@ -32,6 +32,9 @@ import AdminOrgChats from "./pages/AdminOrgChats";
 import OrgPortal from "./pages/OrgPortal";
 import OrgNotifications from "./pages/OrgNotifications";
 import { ImpersonationBanner } from "./components/ImpersonationBanner";
+import ComplianceDashboard from "./pages/compliance/ComplianceDashboard";
+import RequirementsLibrary from "./pages/compliance/RequirementsLibrary";
+import ComplianceClientPanel from "./pages/compliance/ComplianceClientPanel";
 
 function Router() {
   usePageViewLogger();
@@ -63,6 +66,11 @@ function Router() {
       <Route path={"/admin/chat"} component={AdminChatInbox} />
       <Route path={"/admin/organizations"} component={AdminOrganizations} />
       <Route path={"/admin/org-chats"} component={AdminOrgChats} />
+
+      {/* Compliance & Audit module (feature-flagged; nav hidden unless enabled) */}
+      <Route path={"/admin/compliance"} component={ComplianceDashboard} />
+      <Route path={"/admin/compliance/requirements"} component={RequirementsLibrary} />
+      <Route path={"/admin/compliance/clients/:id"} component={ComplianceClientPanel} />
 
       {/* Referrer Portal */}
       <Route path={"/referrer"} component={ReferrerPortal} />

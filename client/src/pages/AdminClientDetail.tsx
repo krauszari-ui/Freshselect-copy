@@ -1,4 +1,5 @@
 import AdminLayout from "@/components/AdminLayout";
+import { ComplianceInlineBanner } from "@/pages/compliance/ComplianceInlineBanner";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
@@ -925,6 +926,7 @@ export default function AdminClientDetail() {
                 <Badge className={`${stageInfo.bg} ${stageInfo.text} text-xs font-medium border-0`}>{stageInfo.label}</Badge>
               </div>
               <p className="text-sm text-slate-500 mt-0.5">Carebridge</p>
+              <ComplianceInlineBanner submissionId={id} />
               {client.referralSource && (
                 <div className="flex items-center gap-1 mt-0.5 text-xs text-blue-600">
                   <Link2 className="h-3 w-3" />

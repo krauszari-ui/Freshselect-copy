@@ -253,6 +253,10 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     ? Object.values(chatUnreadData as Record<string, number>).reduce((sum, n) => sum + (n ?? 0), 0)
     : 0;
 
+  // Compliance module is feature-flagged; only surface the nav when it is enabled.
+  const { data: complianceFlags } = trpc.compliance.flags.useQuery(undefined, { staleTime: 60_000 });
+  const complianceEnabled = complianceFlags?.module === true;
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-green-900">
@@ -308,6 +312,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     }),
     ...(["super_admin", "admin"].includes(user.role) ? ADMIN_ONLY_NAV_ITEMS : []),
     ...(user.role === "super_admin" ? SUPER_ADMIN_ONLY_NAV_ITEMS : []),
+    ...(complianceEnabled && ["super_admin", "admin", "worker", "viewer", "assessor"].includes(user.role)
+      ? [{ path: "/admin/compliance", label: "Compliance", icon: ShieldCheck }]
+      : []),
   ];
 
   return (
