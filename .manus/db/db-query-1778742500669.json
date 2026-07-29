@@ -1,0 +1,18 @@
+{
+  "query": "SHOW COLUMNS FROM clientEmails LIKE 'blastId';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user e1gwTrcxzNkRAvq.27ee13ac78a5 --database aXnNnkD6gAXcPtQ6Yw2PQJ --execute SHOW COLUMNS FROM clientEmails LIKE 'blastId';",
+  "rows": [
+    {
+      "Field": "blastId",
+      "Type": "int",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    }
+  ],
+  "messages": [],
+  "stdout": "Field\tType\tNull\tKey\tDefault\tExtra\nblastId\tint\tYES\t\tNULL\t\n",
+  "stderr": "",
+  "execution_time_ms": 317
+}

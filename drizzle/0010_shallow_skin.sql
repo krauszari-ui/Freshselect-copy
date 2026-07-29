@@ -1,0 +1,1 @@
+ALTER TABLE `referrerMessages` ADD `attachmentUrl` text;

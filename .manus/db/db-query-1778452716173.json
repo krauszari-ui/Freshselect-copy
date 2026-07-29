@@ -1,0 +1,90 @@
+{
+  "query": "SELECT id, firstName, lastName, email, status, createdAt FROM submissions ORDER BY createdAt DESC LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user e1gwTrcxzNkRAvq.27ee13ac78a5 --database aXnNnkD6gAXcPtQ6Yw2PQJ --execute SELECT id, firstName, lastName, email, status, createdAt FROM submissions ORDER BY createdAt DESC LIMIT 10;",
+  "rows": [
+    {
+      "id": "6480001",
+      "firstName": "pearl",
+      "lastName": "pollak",
+      "email": "davidhpollak@gmail.com",
+      "status": "new",
+      "createdAt": "2026-05-10 22:19:03"
+    },
+    {
+      "id": "6450019",
+      "firstName": "Gittel",
+      "lastName": "Preis",
+      "email": "tziryfishman@gmail.com",
+      "status": "new",
+      "createdAt": "2026-05-10 20:02:34"
+    },
+    {
+      "id": "6450018",
+      "firstName": "Etty",
+      "lastName": "Schnitzler",
+      "email": "Fearlessninja25@yahoo.com",
+      "status": "new",
+      "createdAt": "2026-05-10 19:57:24"
+    },
+    {
+      "id": "6450017",
+      "firstName": "Danny ",
+      "lastName": "Schneid",
+      "email": "dannyschneid06@gmail.com",
+      "status": "new",
+      "createdAt": "2026-05-10 19:51:30"
+    },
+    {
+      "id": "6450016",
+      "firstName": "Bracha",
+      "lastName": "Weiss",
+      "email": "bruchy1782@gmail.com",
+      "status": "new",
+      "createdAt": "2026-05-10 19:14:37"
+    },
+    {
+      "id": "6450015",
+      "firstName": "Duvid",
+      "lastName": "Israel",
+      "email": "shulemisreal@gmail.com",
+      "status": "new",
+      "createdAt": "2026-05-10 18:54:10"
+    },
+    {
+      "id": "6450014",
+      "firstName": "Esther",
+      "lastName": "Brachfeld",
+      "email": "brachfeldesty@gmail.com",
+      "status": "new",
+      "createdAt": "2026-05-10 18:43:45"
+    },
+    {
+      "id": "6450013",
+      "firstName": "Menashe",
+      "lastName": "Weiss",
+      "email": "mw153150@gmail.com",
+      "status": "new",
+      "createdAt": "2026-05-10 18:24:41"
+    },
+    {
+      "id": "6450012",
+      "firstName": "Esther",
+      "lastName": "Taub",
+      "email": "Esthertaub3@gmail.com",
+      "status": "new",
+      "createdAt": "2026-05-10 18:17:51"
+    },
+    {
+      "id": "6450011",
+      "firstName": "Eliezer",
+      "lastName": "Saal",
+      "email": "eliezersaal43@gmail.com",
+      "status": "new",
+      "createdAt": "2026-05-10 18:05:53"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tfirstName\tlastName\temail\tstatus\tcreatedAt\n6480001\tpearl\tpollak\tdavidhpollak@gmail.com\tnew\t2026-05-10 22:19:03\n6450019\tGittel\tPreis\ttziryfishman@gmail.com\tnew\t2026-05-10 20:02:34\n6450018\tEtty\tSchnitzler\tFearlessninja25@yahoo.com\tnew\t2026-05-10 19:57:24\n6450017\tDanny \tSchneid\tdannyschneid06@gmail.com\tnew\t2026-05-10 19:51:30\n6450016\tBracha\tWeiss\tbruchy1782@gmail.com\tnew\t2026-05-10 19:14:37\n6450015\tDuvid\tIsrael\tshulemisreal@gmail.com\tnew\t2026-05-10 18:54:10\n6450014\tEsther\tBrachfeld\tbrachfeldesty@gmail.com\tnew\t2026-05-10 18:43:45\n6450013\tMenashe\tWeiss\tmw153150@gmail.com\tnew\t2026-05-10 18:24:41\n6450012\tEsther\tTaub\tEsthertaub3@gmail.com\tnew\t2026-05-10 18:17:51\n6450011\tEliezer\tSaal\teliezersaal43@gmail.com\tnew\t2026-05-10 18:05:53\n",
+  "stderr": "",
+  "execution_time_ms": 297
+}

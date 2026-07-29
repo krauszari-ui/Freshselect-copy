@@ -1,0 +1,13 @@
+{
+  "query": "SELECT \n  JSON_EXTRACT(formData, '$.screeningQuestions') as screeningQuestions\nFROM submissions \nWHERE id = 1980035 LIMIT 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user e1gwTrcxzNkRAvq.27ee13ac78a5 --database aXnNnkD6gAXcPtQ6Yw2PQJ --execute SELECT \n  JSON_EXTRACT(formData, '$.screeningQuestions') as screeningQuestions\nFROM submissions \nWHERE id = 1980035 LIMIT 1;",
+  "rows": [
+    {
+      "screeningQuestions": "{\"breastmilkRefrigeration\": \"No\", \"enrolledHealthHome\": \"\", \"hasChronicIllness\": \"No\", \"householdMembersCount\": \"\", \"householdMembersWithMedicaid\": \"\", \"livingSituation\": \"Renting\", \"medicationsRequireRefrigeration\": \"No\", \"needsWorkAssistance\": \"\", \"otherHealthIssues\": \"No\", \"pregnantOrPostpartum\": \"\", \"receivesSnap\": \"Yes\", \"receivesTanf\": \"\", \"receivesWic\": \"Yes\", \"transportationBarrier\": \"\", \"utilityShutoff\": \"Yes\", \"wantsSchoolHelp\": \"\"}"
+    }
+  ],
+  "messages": [],
+  "stdout": "screeningQuestions\n{\"breastmilkRefrigeration\": \"No\", \"enrolledHealthHome\": \"\", \"hasChronicIllness\": \"No\", \"householdMembersCount\": \"\", \"householdMembersWithMedicaid\": \"\", \"livingSituation\": \"Renting\", \"medicationsRequireRefrigeration\": \"No\", \"needsWorkAssistance\": \"\", \"otherHealthIssues\": \"No\", \"pregnantOrPostpartum\": \"\", \"receivesSnap\": \"Yes\", \"receivesTanf\": \"\", \"receivesWic\": \"Yes\", \"transportationBarrier\": \"\", \"utilityShutoff\": \"Yes\", \"wantsSchoolHelp\": \"\"}\n",
+  "stderr": "",
+  "execution_time_ms": 59
+}

@@ -1,0 +1,9 @@
+{
+  "query": "DELETE FROM submissions WHERE firstName = 'mindy' AND lastName = 'rubin' AND medicaidId = 'YA49965H' AND id != 1980035;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user e1gwTrcxzNkRAvq.27ee13ac78a5 --database aXnNnkD6gAXcPtQ6Yw2PQJ --execute DELETE FROM submissions WHERE firstName = 'mindy' AND lastName = 'rubin' AND medicaidId = 'YA49965H' AND id != 1980035;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 58
+}

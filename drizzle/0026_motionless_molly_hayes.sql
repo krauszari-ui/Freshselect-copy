@@ -1,0 +1,1 @@
+ALTER TABLE `clientEmails` ADD `blastId` int;

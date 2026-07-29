@@ -1,0 +1,15 @@
+{
+  "query": "SELECT AVG(LENGTH(formData)) as avg_formdata_bytes, MAX(LENGTH(formData)) as max_formdata_bytes, COUNT(*) as total_rows FROM submissions;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user e1gwTrcxzNkRAvq.27ee13ac78a5 --database aXnNnkD6gAXcPtQ6Yw2PQJ --execute SELECT AVG(LENGTH(formData)) as avg_formdata_bytes, MAX(LENGTH(formData)) as max_formdata_bytes, COUNT(*) as total_rows FROM submissions;",
+  "rows": [
+    {
+      "avg_formdata_bytes": "11158.6517",
+      "max_formdata_bytes": "60849",
+      "total_rows": "422"
+    }
+  ],
+  "messages": [],
+  "stdout": "avg_formdata_bytes\tmax_formdata_bytes\ttotal_rows\n11158.6517\t60849\t422\n",
+  "stderr": "",
+  "execution_time_ms": 80
+}

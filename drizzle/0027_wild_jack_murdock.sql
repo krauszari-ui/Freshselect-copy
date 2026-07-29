@@ -1,0 +1,1 @@
+ALTER TABLE `emailBlasts` ADD `updatedAt` timestamp DEFAULT (now()) NOT NULL;

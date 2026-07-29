@@ -1,0 +1,20 @@
+CREATE TABLE `submissions` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`referenceNumber` varchar(16) NOT NULL,
+	`firstName` varchar(128) NOT NULL,
+	`lastName` varchar(128) NOT NULL,
+	`email` varchar(320) NOT NULL,
+	`cellPhone` varchar(32) NOT NULL,
+	`medicaidId` varchar(32) NOT NULL,
+	`supermarket` varchar(128) NOT NULL,
+	`referralSource` varchar(128),
+	`status` enum('new','in_review','approved','rejected','on_hold') NOT NULL DEFAULT 'new',
+	`adminNotes` text,
+	`formData` json NOT NULL,
+	`hipaaConsentAt` timestamp NOT NULL,
+	`clickupTaskId` varchar(64),
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `submissions_id` PRIMARY KEY(`id`),
+	CONSTRAINT `submissions_referenceNumber_unique` UNIQUE(`referenceNumber`)
+);

@@ -1,0 +1,9 @@
+{
+  "query": "SHOW INDEX FROM submissions WHERE Key_name NOT IN ('PRIMARY','idx_submissions_status','idx_submissions_stage','idx_submissions_lastName','idx_submissions_medicaidId','idx_submissions_supermarket','idx_submissions_createdAt','idx_submissions_assignedTo','idx_submissions_referralSource','idx_submissions_status_created');",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user e1gwTrcxzNkRAvq.27ee13ac78a5 --database aXnNnkD6gAXcPtQ6Yw2PQJ --execute SHOW INDEX FROM submissions WHERE Key_name NOT IN ('PRIMARY','idx_submissions_status','idx_submissions_stage','idx_submissions_lastName','idx_submissions_medicaidId','idx_submissions_supermarket','idx_submissions_createdAt','idx_submissions_assignedTo','idx_submissions_referralSource','idx_submissions_status_created');",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 188
+}

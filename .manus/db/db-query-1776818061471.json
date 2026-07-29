@@ -1,0 +1,50 @@
+{
+  "query": "SELECT zipcode, COUNT(*) as cnt FROM submissions WHERE zipcode IS NOT NULL GROUP BY zipcode ORDER BY cnt DESC LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user e1gwTrcxzNkRAvq.27ee13ac78a5 --database aXnNnkD6gAXcPtQ6Yw2PQJ --execute SELECT zipcode, COUNT(*) as cnt FROM submissions WHERE zipcode IS NOT NULL GROUP BY zipcode ORDER BY cnt DESC LIMIT 10;",
+  "rows": [
+    {
+      "zipcode": "11219",
+      "cnt": "141"
+    },
+    {
+      "zipcode": "11206",
+      "cnt": "46"
+    },
+    {
+      "zipcode": "11205",
+      "cnt": "35"
+    },
+    {
+      "zipcode": "11204",
+      "cnt": "34"
+    },
+    {
+      "zipcode": "11218",
+      "cnt": "22"
+    },
+    {
+      "zipcode": "11249",
+      "cnt": "21"
+    },
+    {
+      "zipcode": "11211",
+      "cnt": "18"
+    },
+    {
+      "zipcode": "10977",
+      "cnt": "5"
+    },
+    {
+      "zipcode": "10952",
+      "cnt": "4"
+    },
+    {
+      "zipcode": "11230",
+      "cnt": "4"
+    }
+  ],
+  "messages": [],
+  "stdout": "zipcode\tcnt\n11219\t141\n11206\t46\n11205\t35\n11204\t34\n11218\t22\n11249\t21\n11211\t18\n10977\t5\n10952\t4\n11230\t4\n",
+  "stderr": "",
+  "execution_time_ms": 59
+}

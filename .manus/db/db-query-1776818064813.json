@@ -1,0 +1,122 @@
+{
+  "query": "SELECT zipcode, COUNT(*) as cnt FROM submissions WHERE zipcode IS NOT NULL AND zipcode != '' GROUP BY zipcode ORDER BY cnt DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user e1gwTrcxzNkRAvq.27ee13ac78a5 --database aXnNnkD6gAXcPtQ6Yw2PQJ --execute SELECT zipcode, COUNT(*) as cnt FROM submissions WHERE zipcode IS NOT NULL AND zipcode != '' GROUP BY zipcode ORDER BY cnt DESC;",
+  "rows": [
+    {
+      "zipcode": "11219",
+      "cnt": "141"
+    },
+    {
+      "zipcode": "11206",
+      "cnt": "46"
+    },
+    {
+      "zipcode": "11205",
+      "cnt": "35"
+    },
+    {
+      "zipcode": "11204",
+      "cnt": "34"
+    },
+    {
+      "zipcode": "11218",
+      "cnt": "22"
+    },
+    {
+      "zipcode": "11249",
+      "cnt": "21"
+    },
+    {
+      "zipcode": "11211",
+      "cnt": "18"
+    },
+    {
+      "zipcode": "10977",
+      "cnt": "5"
+    },
+    {
+      "zipcode": "11230",
+      "cnt": "4"
+    },
+    {
+      "zipcode": "10952",
+      "cnt": "4"
+    },
+    {
+      "zipcode": "10314",
+      "cnt": "3"
+    },
+    {
+      "zipcode": "11219-4119",
+      "cnt": "2"
+    },
+    {
+      "zipcode": "10950",
+      "cnt": "2"
+    },
+    {
+      "zipcode": "11210",
+      "cnt": "1"
+    },
+    {
+      "zipcode": "11219-4201",
+      "cnt": "1"
+    },
+    {
+      "zipcode": "11218-3660",
+      "cnt": "1"
+    },
+    {
+      "zipcode": "11204-2147",
+      "cnt": "1"
+    },
+    {
+      "zipcode": "11221",
+      "cnt": "1"
+    },
+    {
+      "zipcode": "11219-1737",
+      "cnt": "1"
+    },
+    {
+      "zipcode": "11204-2467",
+      "cnt": "1"
+    },
+    {
+      "zipcode": "11023",
+      "cnt": "1"
+    },
+    {
+      "zipcode": "11211-8148",
+      "cnt": "1"
+    },
+    {
+      "zipcode": "11204-1703",
+      "cnt": "1"
+    },
+    {
+      "zipcode": "11219-4351",
+      "cnt": "1"
+    },
+    {
+      "zipcode": "11204-1112",
+      "cnt": "1"
+    },
+    {
+      "zipcode": "11214",
+      "cnt": "1"
+    },
+    {
+      "zipcode": "11219-3632",
+      "cnt": "1"
+    },
+    {
+      "zipcode": "11205-4300",
+      "cnt": "1"
+    }
+  ],
+  "messages": [],
+  "stdout": "zipcode\tcnt\n11219\t141\n11206\t46\n11205\t35\n11204\t34\n11218\t22\n11249\t21\n11211\t18\n10977\t5\n11230\t4\n10952\t4\n10314\t3\n11219-4119\t2\n10950\t2\n11210\t1\n11219-4201\t1\n11218-3660\t1\n11204-2147\t1\n11221\t1\n11219-1737\t1\n11204-2467\t1\n11023\t1\n11211-8148\t1\n11204-1703\t1\n11219-4351\t1\n11204-1112\t1\n11214\t1\n11219-3632\t1\n11205-4300\t1\n",
+  "stderr": "",
+  "execution_time_ms": 58
+}

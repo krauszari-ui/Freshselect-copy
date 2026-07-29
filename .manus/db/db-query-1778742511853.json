@@ -1,0 +1,100 @@
+{
+  "query": "SELECT id, submissionId, blastId, fromEmail, toEmail, subject, sentAt FROM clientEmails WHERE direction = 'inbound' ORDER BY sentAt DESC LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user e1gwTrcxzNkRAvq.27ee13ac78a5 --database aXnNnkD6gAXcPtQ6Yw2PQJ --execute SELECT id, submissionId, blastId, fromEmail, toEmail, subject, sentAt FROM clientEmails WHERE direction = 'inbound' ORDER BY sentAt DESC LIMIT 10;",
+  "rows": [
+    {
+      "id": "570003",
+      "submissionId": "8220001",
+      "blastId": "NULL",
+      "fromEmail": "arimirel180@gmail.com",
+      "toEmail": "reply-8220001@inbound.freshselectmeals.com",
+      "subject": "Re: Message from FreshSelect Meals",
+      "sentAt": "2026-05-14 05:19:53"
+    },
+    {
+      "id": "480003",
+      "submissionId": "2520103",
+      "blastId": "NULL",
+      "fromEmail": "chaimlsrh@gmail.com",
+      "toEmail": "reply-2520103@inbound.freshselectmeals.com",
+      "subject": "Re: Message from FreshSelect Meals",
+      "sentAt": "2026-05-01 04:33:29"
+    },
+    {
+      "id": "480002",
+      "submissionId": "2520103",
+      "blastId": "NULL",
+      "fromEmail": "chaimlsrh@gmail.com",
+      "toEmail": "reply-2520103@inbound.freshselectmeals.com",
+      "subject": "Re: Message from FreshSelect Meals",
+      "sentAt": "2026-05-01 04:33:07"
+    },
+    {
+      "id": "450001",
+      "submissionId": "3570146",
+      "blastId": "NULL",
+      "fromEmail": "yisroelweiss1@gmail.com",
+      "toEmail": "reply-3570146@inbound.freshselectmeals.com",
+      "subject": "Re: Message from FreshSelect Meals",
+      "sentAt": "2026-04-30 14:53:05"
+    },
+    {
+      "id": "390005",
+      "submissionId": "3630006",
+      "blastId": "NULL",
+      "fromEmail": "yisroel1234@gmail.com",
+      "toEmail": "reply-3630006@inbound.freshselectmeals.com",
+      "subject": "Re: Message from FreshSelect Meals",
+      "sentAt": "2026-04-29 16:36:49"
+    },
+    {
+      "id": "390003",
+      "submissionId": "3630006",
+      "blastId": "NULL",
+      "fromEmail": "yisroel1234@gmail.com",
+      "toEmail": "reply-3630006@inbound.freshselectmeals.com",
+      "subject": "Re: Message from FreshSelect Meals",
+      "sentAt": "2026-04-29 15:54:13"
+    },
+    {
+      "id": "300002",
+      "submissionId": "990001",
+      "blastId": "NULL",
+      "fromEmail": "elky5529@gmail.com",
+      "toEmail": "reply-990001@inbound.freshselectmeals.com",
+      "subject": "Re: missing info",
+      "sentAt": "2026-04-27 02:49:51"
+    },
+    {
+      "id": "300001",
+      "submissionId": "990001",
+      "blastId": "NULL",
+      "fromEmail": "elky5529@gmail.com",
+      "toEmail": "reply-990001@inbound.freshselectmeals.com",
+      "subject": "Re: missing info",
+      "sentAt": "2026-04-27 02:39:55"
+    },
+    {
+      "id": "270004",
+      "submissionId": "2220761",
+      "blastId": "NULL",
+      "fromEmail": "myjourney2980@gmail.com",
+      "toEmail": "reply-2220761@inbound.freshselectmeals.com",
+      "subject": "Re: household members info needed",
+      "sentAt": "2026-04-24 15:26:10"
+    },
+    {
+      "id": "240005",
+      "submissionId": "2640010",
+      "blastId": "NULL",
+      "fromEmail": "debbyp27@gmail.com",
+      "toEmail": "reply-2640010@inbound.freshselectmeals.com",
+      "subject": "Re: /",
+      "sentAt": "2026-04-24 05:45:33"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tsubmissionId\tblastId\tfromEmail\ttoEmail\tsubject\tsentAt\n570003\t8220001\tNULL\tarimirel180@gmail.com\treply-8220001@inbound.freshselectmeals.com\tRe: Message from FreshSelect Meals\t2026-05-14 05:19:53\n480003\t2520103\tNULL\tchaimlsrh@gmail.com\treply-2520103@inbound.freshselectmeals.com\tRe: Message from FreshSelect Meals\t2026-05-01 04:33:29\n480002\t2520103\tNULL\tchaimlsrh@gmail.com\treply-2520103@inbound.freshselectmeals.com\tRe: Message from FreshSelect Meals\t2026-05-01 04:33:07\n450001\t3570146\tNULL\tyisroelweiss1@gmail.com\treply-3570146@inbound.freshselectmeals.com\tRe: Message from FreshSelect Meals\t2026-04-30 14:53:05\n390005\t3630006\tNULL\tyisroel1234@gmail.com\treply-3630006@inbound.freshselectmeals.com\tRe: Message from FreshSelect Meals\t2026-04-29 16:36:49\n390003\t3630006\tNULL\tyisroel1234@gmail.com\treply-3630006@inbound.freshselectmeals.com\tRe: Message from FreshSelect Meals\t2026-04-29 15:54:13\n300002\t990001\tNULL\telky5529@gmail.com\treply-990001@inbound.freshselectmeals.com\tRe: missing info\t2026-04-27 02:49:51\n300001\t990001\tNULL\telky5529@gmail.com\treply-990001@inbound.freshselectmeals.com\tRe: missing info\t2026-04-27 02:39:55\n270004\t2220761\tNULL\tmyjourney2980@gmail.com\treply-2220761@inbound.freshselectmeals.com\tRe: household members info needed\t2026-04-24 15:26:10\n240005\t2640010\tNULL\tdebbyp27@gmail.com\treply-2640010@inbound.freshselectmeals.com\tRe: /\t2026-04-24 05:45:33\n",
+  "stderr": "",
+  "execution_time_ms": 268
+}

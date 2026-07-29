@@ -1,0 +1,9 @@
+{
+  "query": "SELECT id, submissionId, blastId, toEmail, fromEmail, subject, direction, sentAt FROM clientEmails WHERE blastId = 7 OR (sentAt >= '2026-05-14 11:00:00' AND direction = 'outbound') ORDER BY sentAt DESC LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user e1gwTrcxzNkRAvq.27ee13ac78a5 --database aXnNnkD6gAXcPtQ6Yw2PQJ --execute SELECT id, submissionId, blastId, toEmail, fromEmail, subject, direction, sentAt FROM clientEmails WHERE blastId = 7 OR (sentAt >= '2026-05-14 11:00:00' AND direction = 'outbound') ORDER BY sentAt DESC LIMIT 10;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 265
+}

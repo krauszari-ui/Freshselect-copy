@@ -1,0 +1,1 @@
+ALTER TABLE `auditLogs` ADD `sessionId` varchar(64);

@@ -1,0 +1,1 @@
+ALTER TABLE `submissions` ADD `zipcode` varchar(10);

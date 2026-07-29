@@ -1,0 +1,1 @@
+ALTER TABLE `submissions` MODIFY COLUMN `stage` enum('referral','assessment','assessment_recorded','missing_information','not_eligible','level_one_only','level_one_household','level_2_active','ineligible','provider_attestation_required','flagged') NOT NULL DEFAULT 'referral';

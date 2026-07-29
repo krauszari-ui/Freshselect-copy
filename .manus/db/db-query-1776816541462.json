@@ -1,0 +1,9 @@
+{
+  "query": "UPDATE submissions SET newApplicant = 'New' WHERE newApplicant = 'Yes'; UPDATE submissions SET newApplicant = 'Transfer' WHERE newApplicant = 'No';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user e1gwTrcxzNkRAvq.27ee13ac78a5 --database aXnNnkD6gAXcPtQ6Yw2PQJ --execute UPDATE submissions SET newApplicant = 'New' WHERE newApplicant = 'Yes'; UPDATE submissions SET newApplicant = 'Transfer' WHERE newApplicant = 'No';",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 73
+}

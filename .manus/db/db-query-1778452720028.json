@@ -1,0 +1,19 @@
+{
+  "query": "SELECT COUNT(*) as today_count FROM submissions WHERE DATE(createdAt) = CURDATE();\nSELECT COUNT(*) as total FROM submissions;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user e1gwTrcxzNkRAvq.27ee13ac78a5 --database aXnNnkD6gAXcPtQ6Yw2PQJ --execute SELECT COUNT(*) as today_count FROM submissions WHERE DATE(createdAt) = CURDATE();\nSELECT COUNT(*) as total FROM submissions;",
+  "rows": [
+    {
+      "today_count": "27"
+    },
+    {
+      "today_count": "total"
+    },
+    {
+      "today_count": "2920"
+    }
+  ],
+  "messages": [],
+  "stdout": "today_count\n27\ntotal\n2920\n",
+  "stderr": "",
+  "execution_time_ms": 281
+}

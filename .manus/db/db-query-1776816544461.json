@@ -1,0 +1,18 @@
+{
+  "query": "SELECT newApplicant, COUNT(*) as cnt FROM submissions GROUP BY newApplicant ORDER BY cnt DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user e1gwTrcxzNkRAvq.27ee13ac78a5 --database aXnNnkD6gAXcPtQ6Yw2PQJ --execute SELECT newApplicant, COUNT(*) as cnt FROM submissions GROUP BY newApplicant ORDER BY cnt DESC;",
+  "rows": [
+    {
+      "newApplicant": "New",
+      "cnt": "213"
+    },
+    {
+      "newApplicant": "Transfer",
+      "cnt": "124"
+    }
+  ],
+  "messages": [],
+  "stdout": "newApplicant\tcnt\nNew\t213\nTransfer\t124\n",
+  "stderr": "",
+  "execution_time_ms": 53
+}

@@ -1,0 +1,45 @@
+{
+  "query": "EXPLAIN SELECT stage, COUNT(*) as cnt FROM submissions GROUP BY stage;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user e1gwTrcxzNkRAvq.27ee13ac78a5 --database aXnNnkD6gAXcPtQ6Yw2PQJ --execute EXPLAIN SELECT stage, COUNT(*) as cnt FROM submissions GROUP BY stage;",
+  "rows": [
+    {
+      "id": "Projection_4",
+      "estRows": "5.55",
+      "task": "root",
+      "access object": "",
+      "operator info": "axnnnkd6gaxcptq6yw2pqj.submissions.stage, Column#34"
+    },
+    {
+      "id": "└─StreamAgg_19",
+      "estRows": "5.55",
+      "task": "root",
+      "access object": "",
+      "operator info": "group by:axnnnkd6gaxcptq6yw2pqj.submissions.stage, funcs:count(Column#37)->Column#34, funcs:firstrow(axnnnkd6gaxcptq6yw2pqj.submissions.stage)->axnnnkd6gaxcptq6yw2pqj.submissions.stage"
+    },
+    {
+      "id": "  └─IndexReader_20",
+      "estRows": "5.55",
+      "task": "root",
+      "access object": "",
+      "operator info": "index:StreamAgg_8"
+    },
+    {
+      "id": "    └─StreamAgg_8",
+      "estRows": "5.55",
+      "task": "cop[tikv]",
+      "access object": "",
+      "operator info": "group by:axnnnkd6gaxcptq6yw2pqj.submissions.stage, funcs:count(?)->Column#37"
+    },
+    {
+      "id": "      └─IndexFullScan_18",
+      "estRows": "422.00",
+      "task": "cop[tikv]",
+      "access object": "table:submissions, index:idx_submissions_stage(stage)",
+      "operator info": "keep order:true, stats:partial[idx_submissions_stage:missing]"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\testRows\ttask\taccess object\toperator info\nProjection_4\t5.55\troot\t\taxnnnkd6gaxcptq6yw2pqj.submissions.stage, Column#34\n└─StreamAgg_19\t5.55\troot\t\tgroup by:axnnnkd6gaxcptq6yw2pqj.submissions.stage, funcs:count(Column#37)->Column#34, funcs:firstrow(axnnnkd6gaxcptq6yw2pqj.submissions.stage)->axnnnkd6gaxcptq6yw2pqj.submissions.stage\n  └─IndexReader_20\t5.55\troot\t\tindex:StreamAgg_8\n    └─StreamAgg_8\t5.55\tcop[tikv]\t\tgroup by:axnnnkd6gaxcptq6yw2pqj.submissions.stage, funcs:count(?)->Column#37\n      └─IndexFullScan_18\t422.00\tcop[tikv]\ttable:submissions, index:idx_submissions_stage(stage)\tkeep order:true, stats:partial[idx_submissions_stage:missing]\n",
+  "stderr": "",
+  "execution_time_ms": 58
+}

@@ -1,0 +1,28 @@
+{
+  "query": "SELECT \n  JSON_KEYS(formData) as top_keys,\n  JSON_EXTRACT(formData, '$.receivesSnap') as receivesSnap,\n  JSON_EXTRACT(formData, '$.hasSnap') as hasSnap,\n  JSON_EXTRACT(formData, '$.receivesWic') as receivesWic,\n  JSON_EXTRACT(formData, '$.hasWic') as hasWic,\n  JSON_EXTRACT(formData, '$.livingSituation') as livingSituation,\n  JSON_EXTRACT(formData, '$.utilityShutoff') as utilityShutoff,\n  JSON_EXTRACT(formData, '$.receivesTanf') as receivesTanf,\n  JSON_EXTRACT(formData, '$.enrolledHealthHome') as enrolledHealthHome,\n  JSON_EXTRACT(formData, '$.needsWorkAssistance') as needsWorkAssistance,\n  JSON_EXTRACT(formData, '$.wantsSchoolTraining') as wantsSchoolTraining,\n  JSON_EXTRACT(formData, '$.transportationBarrier') as transportationBarrier,\n  JSON_EXTRACT(formData, '$.screening') as screening,\n  JSON_EXTRACT(formData, '$.screeningAnswers') as screeningAnswers,\n  JSON_EXTRACT(formData, '$.foodAllergies') as foodAllergies,\n  JSON_EXTRACT(formData, '$.dietaryRestrictions') as dietaryRestrictions\nFROM submissions \nWHERE id = 1980035 LIMIT 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user e1gwTrcxzNkRAvq.27ee13ac78a5 --database aXnNnkD6gAXcPtQ6Yw2PQJ --execute SELECT \n  JSON_KEYS(formData) as top_keys,\n  JSON_EXTRACT(formData, '$.receivesSnap') as receivesSnap,\n  JSON_EXTRACT(formData, '$.hasSnap') as hasSnap,\n  JSON_EXTRACT(formData, '$.receivesWic') as receivesWic,\n  JSON_EXTRACT(formData, '$.hasWic') as hasWic,\n  JSON_EXTRACT(formData, '$.livingSituation') as livingSituation,\n  JSON_EXTRACT(formData, '$.utilityShutoff') as utilityShutoff,\n  JSON_EXTRACT(formData, '$.receivesTanf') as receivesTanf,\n  JSON_EXTRACT(formData, '$.enrolledHealthHome') as enrolledHealthHome,\n  JSON_EXTRACT(formData, '$.needsWorkAssistance') as needsWorkAssistance,\n  JSON_EXTRACT(formData, '$.wantsSchoolTraining') as wantsSchoolTraining,\n  JSON_EXTRACT(formData, '$.transportationBarrier') as transportationBarrier,\n  JSON_EXTRACT(formData, '$.screening') as screening,\n  JSON_EXTRACT(formData, '$.screeningAnswers') as screeningAnswers,\n  JSON_EXTRACT(formData, '$.foodAllergies') as foodAllergies,\n  JSON_EXTRACT(formData, '$.dietaryRestrictions') as dietaryRestrictions\nFROM submissions \nWHERE id = 1980035 LIMIT 1;",
+  "rows": [
+    {
+      "top_keys": "[\"additionalMembersCount\", \"aptUnit\", \"breakfastItems\", \"cellPhone\", \"city\", \"dateOfBirth\", \"dietaryRestrictions\", \"dinnerItems\", \"dueDate\", \"email\", \"employed\", \"firstName\", \"foodAllergies\", \"foodAllergiesDetails\", \"guardianName\", \"hasSnap\", \"hasWic\", \"healthCategories\", \"hipaaConsent\", \"homePhone\", \"householdMembers\", \"infantDateOfBirth\", \"infantMedicaidId\", \"infantName\", \"lastName\", \"lunchItems\", \"mealFocus\", \"medicaidId\", \"miscarriageDate\", \"needsCookingUtensils\", \"needsMicrowave\", \"needsRefrigerator\", \"neighborhood\", \"newApplicant\", \"ref\", \"screeningQuestions\", \"signatureDataUrl\", \"snackItems\", \"spouseEmployed\", \"state\", \"streetAddress\", \"supermarket\", \"transferAgencyName\", \"zipcode\"]",
+      "receivesSnap": "NULL",
+      "hasSnap": "\"Yes\"",
+      "receivesWic": "NULL",
+      "hasWic": "\"Yes\"",
+      "livingSituation": "NULL",
+      "utilityShutoff": "NULL",
+      "receivesTanf": "NULL",
+      "enrolledHealthHome": "NULL",
+      "needsWorkAssistance": "NULL",
+      "wantsSchoolTraining": "NULL",
+      "transportationBarrier": "NULL",
+      "screening": "NULL",
+      "screeningAnswers": "NULL",
+      "foodAllergies": "\"No\"",
+      "dietaryRestrictions": "\"Kosher\""
+    }
+  ],
+  "messages": [],
+  "stdout": "top_keys\treceivesSnap\thasSnap\treceivesWic\thasWic\tlivingSituation\tutilityShutoff\treceivesTanf\tenrolledHealthHome\tneedsWorkAssistance\twantsSchoolTraining\ttransportationBarrier\tscreening\tscreeningAnswers\tfoodAllergies\tdietaryRestrictions\n[\"additionalMembersCount\", \"aptUnit\", \"breakfastItems\", \"cellPhone\", \"city\", \"dateOfBirth\", \"dietaryRestrictions\", \"dinnerItems\", \"dueDate\", \"email\", \"employed\", \"firstName\", \"foodAllergies\", \"foodAllergiesDetails\", \"guardianName\", \"hasSnap\", \"hasWic\", \"healthCategories\", \"hipaaConsent\", \"homePhone\", \"householdMembers\", \"infantDateOfBirth\", \"infantMedicaidId\", \"infantName\", \"lastName\", \"lunchItems\", \"mealFocus\", \"medicaidId\", \"miscarriageDate\", \"needsCookingUtensils\", \"needsMicrowave\", \"needsRefrigerator\", \"neighborhood\", \"newApplicant\", \"ref\", \"screeningQuestions\", \"signatureDataUrl\", \"snackItems\", \"spouseEmployed\", \"state\", \"streetAddress\", \"supermarket\", \"transferAgencyName\", \"zipcode\"]\tNULL\t\"Yes\"\tNULL\t\"Yes\"\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\t\"No\"\t\"Kosher\"\n",
+  "stderr": "",
+  "execution_time_ms": 93
+}

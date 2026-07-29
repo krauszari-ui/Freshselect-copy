@@ -1,0 +1,40 @@
+{
+  "query": "SELECT medicaidId, COUNT(*) as count, GROUP_CONCAT(id ORDER BY createdAt ASC SEPARATOR ',') as ids, GROUP_CONCAT(CONCAT(firstName,' ',lastName) ORDER BY createdAt ASC SEPARATOR ' | ') as names FROM submissions WHERE medicaidId IS NOT NULL AND medicaidId != '' GROUP BY medicaidId HAVING COUNT(*) > 1 ORDER BY count DESC LIMIT 50;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user e1gwTrcxzNkRAvq.27ee13ac78a5 --database aXnNnkD6gAXcPtQ6Yw2PQJ --execute SELECT medicaidId, COUNT(*) as count, GROUP_CONCAT(id ORDER BY createdAt ASC SEPARATOR ',') as ids, GROUP_CONCAT(CONCAT(firstName,' ',lastName) ORDER BY createdAt ASC SEPARATOR ' | ') as names FROM submissions WHERE medicaidId IS NOT NULL AND medicaidId != '' GROUP BY medicaidId HAVING COUNT(*) > 1 ORDER BY count DESC LIMIT 50;",
+  "rows": [
+    {
+      "medicaidId": "XD69947Y",
+      "count": "3",
+      "ids": "1230001,1290001,1350001",
+      "names": "Malka Moskovics | Malka Moskovics | Malka Moskovics"
+    },
+    {
+      "medicaidId": "SE06837Y",
+      "count": "3",
+      "ids": "1950048,1950049,1950066",
+      "names": "Gittle Friedman | Gittle Friedman | Gittle Friedman"
+    },
+    {
+      "medicaidId": "PN07467H",
+      "count": "2",
+      "ids": "540003,570001",
+      "names": "Toby Reismn | Toby Goldstein"
+    },
+    {
+      "medicaidId": "TY83145M",
+      "count": "2",
+      "ids": "1830002,1830010",
+      "names": "Tzirel Rosenbaum | Tzirel Rosenbaum"
+    },
+    {
+      "medicaidId": "NZ03232T",
+      "count": "2",
+      "ids": "1590001,1950002",
+      "names": "RACHEL  KLINGER | RACHEL KLINGER"
+    }
+  ],
+  "messages": [],
+  "stdout": "medicaidId\tcount\tids\tnames\nXD69947Y\t3\t1230001,1290001,1350001\tMalka Moskovics | Malka Moskovics | Malka Moskovics\nSE06837Y\t3\t1950048,1950049,1950066\tGittle Friedman | Gittle Friedman | Gittle Friedman\nPN07467H\t2\t540003,570001\tToby Reismn | Toby Goldstein\nTY83145M\t2\t1830002,1830010\tTzirel Rosenbaum | Tzirel Rosenbaum\nNZ03232T\t2\t1590001,1950002\tRACHEL  KLINGER | RACHEL KLINGER\n",
+  "stderr": "",
+  "execution_time_ms": 68
+}

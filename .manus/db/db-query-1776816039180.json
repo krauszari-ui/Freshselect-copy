@@ -1,0 +1,45 @@
+{
+  "query": "SELECT id, newApplicant, transferAgencyName, JSON_EXTRACT(formData, '$.newApplicant') as fd_newApplicant, JSON_EXTRACT(formData, '$.transferAgencyName') as fd_transferAgencyName FROM submissions WHERE newApplicant IS NOT NULL LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user e1gwTrcxzNkRAvq.27ee13ac78a5 --database aXnNnkD6gAXcPtQ6Yw2PQJ --execute SELECT id, newApplicant, transferAgencyName, JSON_EXTRACT(formData, '$.newApplicant') as fd_newApplicant, JSON_EXTRACT(formData, '$.transferAgencyName') as fd_transferAgencyName FROM submissions WHERE newApplicant IS NOT NULL LIMIT 5;",
+  "rows": [
+    {
+      "id": "360002",
+      "newApplicant": "New",
+      "transferAgencyName": "",
+      "fd_newApplicant": "\"New\"",
+      "fd_transferAgencyName": "\"\""
+    },
+    {
+      "id": "360003",
+      "newApplicant": "New",
+      "transferAgencyName": "",
+      "fd_newApplicant": "\"New\"",
+      "fd_transferAgencyName": "\"\""
+    },
+    {
+      "id": "540001",
+      "newApplicant": "New",
+      "transferAgencyName": "",
+      "fd_newApplicant": "\"New\"",
+      "fd_transferAgencyName": "\"\""
+    },
+    {
+      "id": "540002",
+      "newApplicant": "New",
+      "transferAgencyName": "",
+      "fd_newApplicant": "\"New\"",
+      "fd_transferAgencyName": "\"\""
+    },
+    {
+      "id": "540003",
+      "newApplicant": "New",
+      "transferAgencyName": "",
+      "fd_newApplicant": "\"New\"",
+      "fd_transferAgencyName": "\"\""
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tnewApplicant\ttransferAgencyName\tfd_newApplicant\tfd_transferAgencyName\n360002\tNew\t\t\"New\"\t\"\"\n360003\tNew\t\t\"New\"\t\"\"\n540001\tNew\t\t\"New\"\t\"\"\n540002\tNew\t\t\"New\"\t\"\"\n540003\tNew\t\t\"New\"\t\"\"\n",
+  "stderr": "",
+  "execution_time_ms": 105
+}

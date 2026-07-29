@@ -1,0 +1,66 @@
+{
+  "query": "SELECT REGEXP_REPLACE(cellPhone, '[^0-9]', '') as cleanPhone, COUNT(*) as count, GROUP_CONCAT(id ORDER BY createdAt ASC SEPARATOR ',') as ids, GROUP_CONCAT(CONCAT(firstName,' ',lastName) ORDER BY createdAt ASC SEPARATOR ' | ') as names, GROUP_CONCAT(medicaidId ORDER BY createdAt ASC SEPARATOR ' | ') as medicaidIds FROM submissions WHERE cellPhone IS NOT NULL AND cellPhone != '' GROUP BY REGEXP_REPLACE(cellPhone, '[^0-9]', '') HAVING COUNT(*) > 1 ORDER BY count DESC LIMIT 30;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user e1gwTrcxzNkRAvq.27ee13ac78a5 --database aXnNnkD6gAXcPtQ6Yw2PQJ --execute SELECT REGEXP_REPLACE(cellPhone, '[^0-9]', '') as cleanPhone, COUNT(*) as count, GROUP_CONCAT(id ORDER BY createdAt ASC SEPARATOR ',') as ids, GROUP_CONCAT(CONCAT(firstName,' ',lastName) ORDER BY createdAt ASC SEPARATOR ' | ') as names, GROUP_CONCAT(medicaidId ORDER BY createdAt ASC SEPARATOR ' | ') as medicaidIds FROM submissions WHERE cellPhone IS NOT NULL AND cellPhone != '' GROUP BY REGEXP_REPLACE(cellPhone, '[^0-9]', '') HAVING COUNT(*) > 1 ORDER BY count DESC LIMIT 30;",
+  "rows": [
+    {
+      "cleanPhone": "3472443201",
+      "count": "3",
+      "ids": "1230001,1290001,1350001",
+      "names": "Malka Moskovics | Malka Moskovics | Malka Moskovics",
+      "medicaidIds": "XD69947Y | XD69947Y | XD69947Y"
+    },
+    {
+      "cleanPhone": "3477683510",
+      "count": "2",
+      "ids": "540003,570001",
+      "names": "Toby Reismn | Toby Goldstein",
+      "medicaidIds": "PN07467H | PN07467H"
+    },
+    {
+      "cleanPhone": "3474527402",
+      "count": "2",
+      "ids": "960001,1590022",
+      "names": "malka wagschal | malka wagschal",
+      "medicaidIds": "AS12346W | SK81303Z"
+    },
+    {
+      "cleanPhone": "9294090315",
+      "count": "2",
+      "ids": "1830002,1830010",
+      "names": "Tzirel Rosenbaum | Tzirel Rosenbaum",
+      "medicaidIds": "TY83145M | TY83145M"
+    },
+    {
+      "cleanPhone": "7189306251",
+      "count": "2",
+      "ids": "1590001,1950002",
+      "names": "RACHEL  KLINGER | RACHEL KLINGER",
+      "medicaidIds": "NZ03232T | NZ03232T"
+    },
+    {
+      "cleanPhone": "7184830470",
+      "count": "2",
+      "ids": "1590023,1590044",
+      "names": "Avraham DASKAL | Sara Segelbaum",
+      "medicaidIds": "VX58753T | ZE06295E"
+    },
+    {
+      "cleanPhone": "7188572902",
+      "count": "2",
+      "ids": "1950048,1950049",
+      "names": "Gittle Friedman | Gittle Friedman",
+      "medicaidIds": "SE06837Y | SE06837Y"
+    },
+    {
+      "cleanPhone": "3478353482",
+      "count": "2",
+      "ids": "1980085,1980087",
+      "names": "Hannah Goldhersch | Dov  Jacobs",
+      "medicaidIds": "YJ43470F | ZJ61239X"
+    }
+  ],
+  "messages": [],
+  "stdout": "cleanPhone\tcount\tids\tnames\tmedicaidIds\n3472443201\t3\t1230001,1290001,1350001\tMalka Moskovics | Malka Moskovics | Malka Moskovics\tXD69947Y | XD69947Y | XD69947Y\n3477683510\t2\t540003,570001\tToby Reismn | Toby Goldstein\tPN07467H | PN07467H\n3474527402\t2\t960001,1590022\tmalka wagschal | malka wagschal\tAS12346W | SK81303Z\n9294090315\t2\t1830002,1830010\tTzirel Rosenbaum | Tzirel Rosenbaum\tTY83145M | TY83145M\n7189306251\t2\t1590001,1950002\tRACHEL  KLINGER | RACHEL KLINGER\tNZ03232T | NZ03232T\n7184830470\t2\t1590023,1590044\tAvraham DASKAL | Sara Segelbaum\tVX58753T | ZE06295E\n7188572902\t2\t1950048,1950049\tGittle Friedman | Gittle Friedman\tSE06837Y | SE06837Y\n3478353482\t2\t1980085,1980087\tHannah Goldhersch | Dov  Jacobs\tYJ43470F | ZJ61239X\n",
+  "stderr": "",
+  "execution_time_ms": 65
+}

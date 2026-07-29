@@ -1,0 +1,130 @@
+{
+  "query": "SELECT id, firstName, lastName, medicaidId, cellPhone, email, createdAt, referenceNumber, status, stage FROM submissions WHERE firstName LIKE '%Mindy%' AND lastName LIKE '%Rubin%' ORDER BY createdAt DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user e1gwTrcxzNkRAvq.27ee13ac78a5 --database aXnNnkD6gAXcPtQ6Yw2PQJ --execute SELECT id, firstName, lastName, medicaidId, cellPhone, email, createdAt, referenceNumber, status, stage FROM submissions WHERE firstName LIKE '%Mindy%' AND lastName LIKE '%Rubin%' ORDER BY createdAt DESC;",
+  "rows": [
+    {
+      "id": "1980044",
+      "firstName": "mindy",
+      "lastName": "rubin",
+      "medicaidId": "YA49965H",
+      "cellPhone": "9177566631",
+      "email": "hershelrubin578@gmail.com",
+      "createdAt": "2026-04-22 00:28:53",
+      "referenceNumber": "CM8RJ6",
+      "status": "new",
+      "stage": "referral"
+    },
+    {
+      "id": "1980043",
+      "firstName": "mindy",
+      "lastName": "rubin",
+      "medicaidId": "YA49965H",
+      "cellPhone": "9177566631",
+      "email": "hershelrubin578@gmail.com",
+      "createdAt": "2026-04-22 00:27:48",
+      "referenceNumber": "F9BT62",
+      "status": "new",
+      "stage": "referral"
+    },
+    {
+      "id": "1980042",
+      "firstName": "mindy",
+      "lastName": "rubin",
+      "medicaidId": "YA49965H",
+      "cellPhone": "9177566631",
+      "email": "hershelrubin578@gmail.com",
+      "createdAt": "2026-04-22 00:27:46",
+      "referenceNumber": "X2I61I",
+      "status": "new",
+      "stage": "referral"
+    },
+    {
+      "id": "1980041",
+      "firstName": "mindy",
+      "lastName": "rubin",
+      "medicaidId": "YA49965H",
+      "cellPhone": "9177566631",
+      "email": "hershelrubin578@gmail.com",
+      "createdAt": "2026-04-22 00:27:45",
+      "referenceNumber": "4R43S1",
+      "status": "new",
+      "stage": "referral"
+    },
+    {
+      "id": "1980040",
+      "firstName": "mindy",
+      "lastName": "rubin",
+      "medicaidId": "YA49965H",
+      "cellPhone": "9177566631",
+      "email": "hershelrubin578@gmail.com",
+      "createdAt": "2026-04-22 00:27:33",
+      "referenceNumber": "MT0XQ9",
+      "status": "new",
+      "stage": "referral"
+    },
+    {
+      "id": "1980039",
+      "firstName": "mindy",
+      "lastName": "rubin",
+      "medicaidId": "YA49965H",
+      "cellPhone": "9177566631",
+      "email": "hershelrubin578@gmail.com",
+      "createdAt": "2026-04-22 00:27:30",
+      "referenceNumber": "YA20TW",
+      "status": "new",
+      "stage": "referral"
+    },
+    {
+      "id": "1980038",
+      "firstName": "mindy",
+      "lastName": "rubin",
+      "medicaidId": "YA49965H",
+      "cellPhone": "9177566631",
+      "email": "hershelrubin578@gmail.com",
+      "createdAt": "2026-04-22 00:27:29",
+      "referenceNumber": "0T1W9Y",
+      "status": "new",
+      "stage": "referral"
+    },
+    {
+      "id": "1980037",
+      "firstName": "mindy",
+      "lastName": "rubin",
+      "medicaidId": "YA49965H",
+      "cellPhone": "9177566631",
+      "email": "hershelrubin578@gmail.com",
+      "createdAt": "2026-04-22 00:27:05",
+      "referenceNumber": "RTQTJG",
+      "status": "new",
+      "stage": "referral"
+    },
+    {
+      "id": "1980036",
+      "firstName": "mindy",
+      "lastName": "rubin",
+      "medicaidId": "YA49965H",
+      "cellPhone": "9177566631",
+      "email": "hershelrubin578@gmail.com",
+      "createdAt": "2026-04-22 00:27:03",
+      "referenceNumber": "YP8AUB",
+      "status": "new",
+      "stage": "referral"
+    },
+    {
+      "id": "1980035",
+      "firstName": "mindy",
+      "lastName": "rubin",
+      "medicaidId": "YA49965H",
+      "cellPhone": "9177566631",
+      "email": "hershelrubin578@gmail.com",
+      "createdAt": "2026-04-22 00:27:01",
+      "referenceNumber": "ZB8351",
+      "status": "new",
+      "stage": "referral"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tfirstName\tlastName\tmedicaidId\tcellPhone\temail\tcreatedAt\treferenceNumber\tstatus\tstage\n1980044\tmindy\trubin\tYA49965H\t9177566631\thershelrubin578@gmail.com\t2026-04-22 00:28:53\tCM8RJ6\tnew\treferral\n1980043\tmindy\trubin\tYA49965H\t9177566631\thershelrubin578@gmail.com\t2026-04-22 00:27:48\tF9BT62\tnew\treferral\n1980042\tmindy\trubin\tYA49965H\t9177566631\thershelrubin578@gmail.com\t2026-04-22 00:27:46\tX2I61I\tnew\treferral\n1980041\tmindy\trubin\tYA49965H\t9177566631\thershelrubin578@gmail.com\t2026-04-22 00:27:45\t4R43S1\tnew\treferral\n1980040\tmindy\trubin\tYA49965H\t9177566631\thershelrubin578@gmail.com\t2026-04-22 00:27:33\tMT0XQ9\tnew\treferral\n1980039\tmindy\trubin\tYA49965H\t9177566631\thershelrubin578@gmail.com\t2026-04-22 00:27:30\tYA20TW\tnew\treferral\n1980038\tmindy\trubin\tYA49965H\t9177566631\thershelrubin578@gmail.com\t2026-04-22 00:27:29\t0T1W9Y\tnew\treferral\n1980037\tmindy\trubin\tYA49965H\t9177566631\thershelrubin578@gmail.com\t2026-04-22 00:27:05\tRTQTJG\tnew\treferral\n1980036\tmindy\trubin\tYA49965H\t9177566631\thershelrubin578@gmail.com\t2026-04-22 00:27:03\tYP8AUB\tnew\treferral\n1980035\tmindy\trubin\tYA49965H\t9177566631\thershelrubin578@gmail.com\t2026-04-22 00:27:01\tZB8351\tnew\treferral\n",
+  "stderr": "",
+  "execution_time_ms": 126
+}

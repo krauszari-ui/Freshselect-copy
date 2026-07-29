@@ -1,0 +1,45 @@
+{
+  "query": "EXPLAIN SELECT id, firstName, lastName, medicaidId, cellPhone, email, createdAt, stage, status, supermarket, neighborhood, zipcode, newApplicant, additionalMembersCount FROM submissions ORDER BY createdAt DESC LIMIT 25 OFFSET 0;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user e1gwTrcxzNkRAvq.27ee13ac78a5 --database aXnNnkD6gAXcPtQ6Yw2PQJ --execute EXPLAIN SELECT id, firstName, lastName, medicaidId, cellPhone, email, createdAt, stage, status, supermarket, neighborhood, zipcode, newApplicant, additionalMembersCount FROM submissions ORDER BY createdAt DESC LIMIT 25 OFFSET 0;",
+  "rows": [
+    {
+      "id": "Projection_6",
+      "estRows": "25.00",
+      "task": "root",
+      "access object": "",
+      "operator info": "axnnnkd6gaxcptq6yw2pqj.submissions.id, axnnnkd6gaxcptq6yw2pqj.submissions.firstname, axnnnkd6gaxcptq6yw2pqj.submissions.lastname, axnnnkd6gaxcptq6yw2pqj.submissions.medicaidid, axnnnkd6gaxcptq6yw2pqj.submissions.cellphone, axnnnkd6gaxcptq6yw2pqj.submissions.email, axnnnkd6gaxcptq6yw2pqj.submissions.createdat, axnnnkd6gaxcptq6yw2pqj.submissions.stage, axnnnkd6gaxcptq6yw2pqj.submissions.status, axnnnkd6gaxcptq6yw2pqj.submissions.supermarket, axnnnkd6gaxcptq6yw2pqj.submissions.neighborhood, axnnnkd6gaxcptq6yw2pqj.submissions.zipcode, axnnnkd6gaxcptq6yw2pqj.submissions.newapplicant, axnnnkd6gaxcptq6yw2pqj.submissions.additionalmemberscount"
+    },
+    {
+      "id": "└─IndexLookUp_18",
+      "estRows": "25.00",
+      "task": "root",
+      "access object": "",
+      "operator info": "limit embedded(offset:0, count:25)"
+    },
+    {
+      "id": "  ├─Limit_17(Build)",
+      "estRows": "25.00",
+      "task": "cop[tikv]",
+      "access object": "",
+      "operator info": "offset:?, count:?"
+    },
+    {
+      "id": "  │ └─IndexFullScan_15",
+      "estRows": "25.00",
+      "task": "cop[tikv]",
+      "access object": "table:submissions, index:idx_submissions_createdAt(createdAt)",
+      "operator info": "keep order:true, desc, stats:partial[idx_submissions_status:missing, idx_submissions_stage:missing, idx_submissions_lastname:missing...(more: 4 missing)]"
+    },
+    {
+      "id": "  └─TableRowIDScan_16(Probe)",
+      "estRows": "25.00",
+      "task": "cop[tikv]",
+      "access object": "table:submissions",
+      "operator info": "keep order:false, stats:partial[idx_submissions_status:missing, idx_submissions_stage:missing, idx_submissions_lastname:missing...(more: 4 missing)]"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\testRows\ttask\taccess object\toperator info\nProjection_6\t25.00\troot\t\taxnnnkd6gaxcptq6yw2pqj.submissions.id, axnnnkd6gaxcptq6yw2pqj.submissions.firstname, axnnnkd6gaxcptq6yw2pqj.submissions.lastname, axnnnkd6gaxcptq6yw2pqj.submissions.medicaidid, axnnnkd6gaxcptq6yw2pqj.submissions.cellphone, axnnnkd6gaxcptq6yw2pqj.submissions.email, axnnnkd6gaxcptq6yw2pqj.submissions.createdat, axnnnkd6gaxcptq6yw2pqj.submissions.stage, axnnnkd6gaxcptq6yw2pqj.submissions.status, axnnnkd6gaxcptq6yw2pqj.submissions.supermarket, axnnnkd6gaxcptq6yw2pqj.submissions.neighborhood, axnnnkd6gaxcptq6yw2pqj.submissions.zipcode, axnnnkd6gaxcptq6yw2pqj.submissions.newapplicant, axnnnkd6gaxcptq6yw2pqj.submissions.additionalmemberscount\n└─IndexLookUp_18\t25.00\troot\t\tlimit embedded(offset:0, count:25)\n  ├─Limit_17(Build)\t25.00\tcop[tikv]\t\toffset:?, count:?\n  │ └─IndexFullScan_15\t25.00\tcop[tikv]\ttable:submissions, index:idx_submissions_createdAt(createdAt)\tkeep order:true, desc, stats:partial[idx_submissions_status:missing, idx_submissions_stage:missing, idx_submissions_lastname:missing...(more: 4 missing)]\n  └─TableRowIDScan_16(Probe)\t25.00\tcop[tikv]\ttable:submissions\tkeep order:false, stats:partial[idx_submissions_status:missing, idx_submissions_stage:missing, idx_submissions_lastname:missing...(more: 4 missing)]\n",
+  "stderr": "",
+  "execution_time_ms": 157
+}

@@ -1,0 +1,22 @@
+{
+  "query": "SELECT JSON_EXTRACT(formData, '$.newApplicant') as fd_val, COUNT(*) as cnt FROM submissions GROUP BY fd_val ORDER BY cnt DESC LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user e1gwTrcxzNkRAvq.27ee13ac78a5 --database aXnNnkD6gAXcPtQ6Yw2PQJ --execute SELECT JSON_EXTRACT(formData, '$.newApplicant') as fd_val, COUNT(*) as cnt FROM submissions GROUP BY fd_val ORDER BY cnt DESC LIMIT 10;",
+  "rows": [
+    {
+      "fd_val": "\"New\"",
+      "cnt": "177"
+    },
+    {
+      "fd_val": "\"Transfer\"",
+      "cnt": "124"
+    },
+    {
+      "fd_val": "\"Yes\"",
+      "cnt": "37"
+    }
+  ],
+  "messages": [],
+  "stdout": "fd_val\tcnt\n\"New\"\t177\n\"Transfer\"\t124\n\"Yes\"\t37\n",
+  "stderr": "",
+  "execution_time_ms": 77
+}

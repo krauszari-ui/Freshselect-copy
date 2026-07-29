@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE IF NOT EXISTS `emailBlasts` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`name` varchar(256) NOT NULL,\n\t`subject` varchar(512) NOT NULL,\n\t`body` text NOT NULL,\n\t`filterStatus` varchar(64),\n\t`scheduledAt` timestamp NOT NULL,\n\t`scheduleCronTaskUid` varchar(65),\n\t`blastStatus` enum('scheduled','sending','sent','cancelled','failed') NOT NULL DEFAULT 'scheduled',\n\t`sentCount` int DEFAULT 0,\n\t`failedCount` int DEFAULT 0,\n\t`createdBy` int,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\t`sentAt` timestamp,\n\tCONSTRAINT `emailBlasts_id` PRIMARY KEY(`id`)\n);\nALTER TABLE `users` ADD COLUMN IF NOT EXISTS `failedLoginAttempts` int DEFAULT 0 NOT NULL;\nALTER TABLE `users` ADD COLUMN IF NOT EXISTS `lockedUntil` timestamp;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user e1gwTrcxzNkRAvq.27ee13ac78a5 --database aXnNnkD6gAXcPtQ6Yw2PQJ --execute CREATE TABLE IF NOT EXISTS `emailBlasts` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`name` varchar(256) NOT NULL,\n\t`subject` varchar(512) NOT NULL,\n\t`body` text NOT NULL,\n\t`filterStatus` varchar(64),\n\t`scheduledAt` timestamp NOT NULL,\n\t`scheduleCronTaskUid` varchar(65),\n\t`blastStatus` enum('scheduled','sending','sent','cancelled','failed') NOT NULL DEFAULT 'scheduled',\n\t`sentCount` int DEFAULT 0,\n\t`failedCount` int DEFAULT 0,\n\t`createdBy` int,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\t`sentAt` timestamp,\n\tCONSTRAINT `emailBlasts_id` PRIMARY KEY(`id`)\n);\nALTER TABLE `users` ADD COLUMN IF NOT EXISTS `failedLoginAttempts` int DEFAULT 0 NOT NULL;\nALTER TABLE `users` ADD COLUMN IF NOT EXISTS `lockedUntil` timestamp;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 383
+}

@@ -1,0 +1,1 @@
+ALTER TABLE `caseNotes` ADD `authorName` varchar(255);
