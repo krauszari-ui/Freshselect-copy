@@ -20,8 +20,10 @@ import { nanoid } from "nanoid";
 export const ALLOWED_ORIGINS = [
   "https://freshselectmeals.com",
   "https://www.freshselectmeals.com",
-  // Vercel preview deployments
-  /^https:\/\/freshselect-meals[a-z0-9-]*\.vercel\.app$/,
+  // Vercel deployments — this project deploys under both the "freshselect-meals"
+  // and "freshselect-copy" domains (production + preview URLs). Match both prefixes
+  // explicitly rather than a blanket *.vercel.app (which would trust any Vercel app).
+  /^https:\/\/freshselect-(meals|copy)[a-z0-9-]*\.vercel\.app$/,
   // Manus dev / preview environments (multi-level subdomains like 3000-xxx.us2.manus.computer)
   /^https:\/\/[\w.-]+\.manus\.computer$/,
   /^https:\/\/[\w.-]+\.manus\.space$/,
