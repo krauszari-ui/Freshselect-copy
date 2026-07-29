@@ -69,13 +69,19 @@ export default function ComplianceClientPanel() {
             <TabsTrigger value="eligibility">Eligibility</TabsTrigger>
             <TabsTrigger value="referrals">Referrals</TabsTrigger>
             <TabsTrigger value="authorizations">Authorizations</TabsTrigger>
+            <TabsTrigger value="nutrition">Nutrition</TabsTrigger>
             <TabsTrigger value="requirements">Requirements</TabsTrigger>
+            <TabsTrigger value="deliveries">Deliveries</TabsTrigger>
+            <TabsTrigger value="billing">Billing</TabsTrigger>
           </TabsList>
 
           <TabsContent value="eligibility"><EligibilityTab submissionId={submissionId} /></TabsContent>
           <TabsContent value="referrals"><ReferralsTab submissionId={submissionId} /></TabsContent>
           <TabsContent value="authorizations"><AuthorizationsTab submissionId={submissionId} /></TabsContent>
+          <TabsContent value="nutrition"><NutritionTab submissionId={submissionId} /></TabsContent>
           <TabsContent value="requirements"><RequirementsTab submissionId={submissionId} /></TabsContent>
+          <TabsContent value="deliveries"><DeliveriesTab submissionId={submissionId} /></TabsContent>
+          <TabsContent value="billing"><BillingTab submissionId={submissionId} /></TabsContent>
         </Tabs>
       </div>
     </AdminLayout>
@@ -248,6 +254,129 @@ function RequirementsTab({ submissionId }: { submissionId: number }) {
               {a.status !== "satisfied" && (
                 <Button size="sm" variant="outline" disabled={setStatus.isPending} onClick={() => setStatus.mutate({ assignmentId: a.id, submissionId, status: "satisfied" })}>Mark satisfied</Button>
               )}
+            </li>
+          ))}
+        </ul>
+      </QueryStates>
+    </SectionShell>
+  );
+}
+
+function NutritionTab({ submissionId }: { submissionId: number }) {
+  const utils = trpc.useUtils();
+  const list = trpc.compliance.nutrition.listAssessments.useQuery({ submissionId });
+  const [diagnosis, setDiagnosis] = useState("");
+  const create = trpc.compliance.nutrition.createAssessment.useMutation({
+    onSuccess: () => { setDiagnosis(""); utils.compliance.nutrition.listAssessments.invalidate({ submissionId }); toast.success("Assessment recorded (prior superseded)"); },
+    onError: (e) => toast.error(e.message),
+  });
+  return (
+    <SectionShell
+      title="Nutrition assessments (a later assessment supersedes, never deletes)"
+      action={
+        <div className="flex items-end gap-2">
+          <div><Label htmlFor="nd" className="text-xs">Nutrition diagnosis</Label><Input id="nd" className="h-8 w-56" value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} /></div>
+          <Button size="sm" className="gap-1" disabled={create.isPending || !diagnosis} onClick={() => create.mutate({ submissionId, nutritionDiagnosis: diagnosis })}>
+            <Plus className="h-4 w-4" aria-hidden="true" /> Add
+          </Button>
+        </div>
+      }
+    >
+      <QueryStates q={list} empty="No nutrition assessments yet.">
+        <ul className="divide-y text-sm">
+          {(list.data ?? []).map((a) => (
+            <li key={a.id} className="py-2 flex items-center justify-between">
+              <span>
+                <span className="text-slate-700">{a.nutritionDiagnosis ?? "Assessment"}</span>
+                {a.superseded ? <Badge variant="secondary" className="ml-2">superseded</Badge> : <Badge variant="default" className="ml-2">current</Badge>}
+              </span>
+              <span className="text-slate-400">{new Date(a.createdAt).toLocaleDateString()}</span>
+            </li>
+          ))}
+        </ul>
+      </QueryStates>
+    </SectionShell>
+  );
+}
+
+function DeliveriesTab({ submissionId }: { submissionId: number }) {
+  const utils = trpc.useUtils();
+  const list = trpc.compliance.encounters.list.useQuery({ submissionId });
+  const create = trpc.compliance.encounters.create.useMutation({
+    onSuccess: () => { utils.compliance.encounters.list.invalidate({ submissionId }); toast.success("Encounter created"); },
+    onError: (e) => toast.error(e.message),
+  });
+  const transition = trpc.compliance.encounters.transition.useMutation({
+    onSuccess: () => utils.compliance.encounters.list.invalidate({ submissionId }),
+    onError: (e) => toast.error(e.message.replace(/^.*TRANSITION_DENIED:/, "Cannot transition: ")),
+  });
+  const NEXT: Record<string, { to: string; label: string; approval?: boolean }> = {
+    draft: { to: "documented", label: "Mark documented" },
+    documented: { to: "pending_review", label: "Send for review" },
+    pending_review: { to: "approved", label: "Approve" },
+    approved: { to: "locked", label: "Lock", approval: true },
+  };
+  return (
+    <SectionShell
+      title="Service encounters & deliveries"
+      action={
+        <Button size="sm" className="gap-1" disabled={create.isPending} onClick={() => create.mutate({ submissionId, units: 1, unitType: "meal", dateOfService: new Date() })}>
+          <Plus className="h-4 w-4" aria-hidden="true" /> New encounter
+        </Button>
+      }
+    >
+      <QueryStates q={list} empty="No encounters yet.">
+        <ul className="divide-y text-sm">
+          {(list.data ?? []).map((e) => {
+            const next = NEXT[e.state];
+            return (
+              <li key={e.id} className="py-2 flex items-center justify-between gap-2">
+                <span>
+                  <Badge variant={e.state === "paid" ? "default" : "secondary"}>{e.state.replace(/_/g, " ")}</Badge>
+                  <span className="ml-2 text-slate-700">{e.units} {e.unitType}(s)</span>
+                  {e.dateOfService && <span className="ml-2 text-slate-400">{new Date(e.dateOfService).toLocaleDateString()}</span>}
+                </span>
+                {next && (
+                  <Button size="sm" variant="outline" disabled={transition.isPending} onClick={() => transition.mutate({ encounterId: e.id, submissionId, to: next.to as "documented", hasApproval: next.approval })}>
+                    {next.label}
+                  </Button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </QueryStates>
+    </SectionShell>
+  );
+}
+
+function BillingTab({ submissionId }: { submissionId: number }) {
+  const utils = trpc.useUtils();
+  const list = trpc.compliance.billing.list.useQuery({ submissionId });
+  const approve = trpc.compliance.billing.approveInvoice.useMutation({
+    onSuccess: () => utils.compliance.billing.list.invalidate({ submissionId }),
+    onError: (e) => toast.error(e.message.replace(/SEPARATION_OF_DUTIES_VIOLATION/, "You cannot approve an invoice you created.")),
+  });
+  const pay = trpc.compliance.billing.recordPayment.useMutation({
+    onSuccess: (r) => { utils.compliance.billing.list.invalidate({ submissionId }); toast.success(`Payment: ${r.status} (variance ${r.variance})`); },
+    onError: (e) => toast.error(e.message),
+  });
+  return (
+    <SectionShell title="Invoices & payments (referral → … → payment reconciliation)">
+      <QueryStates q={list} empty="No invoices yet. Invoices are created from documented service encounters.">
+        <ul className="divide-y text-sm">
+          {(list.data ?? []).map((inv) => (
+            <li key={inv.id} className="py-2 flex items-center justify-between gap-2">
+              <span>
+                <Badge variant={inv.status === "paid" ? "default" : "secondary"}>{inv.status}</Badge>
+                <span className="ml-2 text-slate-700">Expected ${inv.expectedTotal ?? "0.00"}</span>
+                {inv.paidTotal && <span className="ml-2 text-slate-500">Paid ${inv.paidTotal}</span>}
+                <Badge variant="outline" className="ml-2">{inv.reconciliationStatus}</Badge>
+              </span>
+              <span className="flex gap-2">
+                {inv.status === "draft" && <Button size="sm" variant="outline" disabled={approve.isPending} onClick={() => approve.mutate({ invoiceId: inv.id, submissionId })}>Approve</Button>}
+                {(inv.status === "approved" || inv.status === "submitted") && <Button size="sm" variant="outline" disabled={pay.isPending} onClick={() => pay.mutate({ invoiceId: inv.id, submissionId, paidAmount: inv.expectedTotal ?? "0.00" })}>Record payment</Button>}
+              </span>
             </li>
           ))}
         </ul>

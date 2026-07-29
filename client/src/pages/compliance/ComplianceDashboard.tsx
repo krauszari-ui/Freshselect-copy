@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
-import { ShieldCheck, ShieldAlert, BookOpen, Users, Loader2, CheckCircle2, XCircle, Info } from "lucide-react";
+import { ShieldCheck, ShieldAlert, BookOpen, Users, Loader2, CheckCircle2, XCircle, Info, Search } from "lucide-react";
 
 /**
  * Executive compliance dashboard. Cards deep-link to the underlying records.
@@ -101,7 +101,22 @@ export default function ComplianceDashboard() {
               </CardHeader>
               <CardContent className="text-sm text-slate-600">
                 Open a client to view their compliance record: eligibility, referrals, authorizations,
-                requirements, and derived readiness.
+                nutrition, requirements, deliveries, billing, and derived readiness.
+              </CardContent>
+            </Card>
+          </Link>
+
+          {/* Self-audit & findings workspace */}
+          <Link href="/admin/compliance/audits">
+            <Card className="hover:border-green-500 transition-colors cursor-pointer h-full">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Search className="h-4 w-4 text-green-700" aria-hidden="true" /> Self-audit & findings
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-slate-600">
+                Run self-audits with reproducible sampling; track findings and corrective actions
+                that cannot close without verification.
               </CardContent>
             </Card>
           </Link>

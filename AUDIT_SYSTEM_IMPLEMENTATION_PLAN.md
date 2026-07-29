@@ -1,6 +1,6 @@
 # FreshSelect Meals — Compliance & Audit System: Implementation Plan
 
-**Status:** Phase 0–2 foundation implemented (behind feature flags); Phases 3–4 designed.
+**Status:** Phases 0–3 implemented (behind feature flags); Phase 4 (hardening/migration) designed.
 **Scope of this document:** the complete design for the compliance/audit module, what has
 been built in this release, and the roadmap + guides for the remainder.
 
@@ -217,16 +217,20 @@ supports a Redis adapter for multi-instance correctness.
   applicability, retroactivity guard), derived readiness, gates + exceptions, `compliance.*`
   tRPC router, UI (dashboard, requirements library, per-client panel + banner).
 
+- Phase 3 (built): nutrition assessments + clinical approvals (credential-validity gate;
+  supersede-not-destroy); service delivery/encounters with the full state machine (Draft→…→
+  Locked→Invoiced→Paid; amendment-only edits after lock); billing with expected-amount decimal
+  math, deterministic invoice idempotency (duplicate billing impossible), line validation,
+  reconciliation chain, payments/denials/adjustments/recoupments; self-audit with reproducible
+  sampling (random/stratified/risk/dollar/judgmental, preserved population snapshot + seed,
+  no-replacement) and error-rate that excludes N/A & insufficient-evidence; CAPA (findings that
+  cannot close without corrective action + verification evidence + passed follow-up test +
+  separate compliance approver); overpayments (restricted, advisory, required disclaimer).
+
 **Designed, not yet coded (follow-on, no rework required):**
-- Phase 2 (remainder): nutrition documentation + clinical approvals; service delivery/encounters
-  with the state machine (Draft→…→Locked→Invoiced→Paid, amendments after lock); billing +
-  reconciliation (referral→eligibility→auth→service→evidence→invoice→payment) with idempotency.
-- Phase 3: self-audit (scopes/populations/samples with preserved snapshots, seeds, and
-  no-replacement of failed records; test results incl. Insufficient Evidence); CAPA (findings
-  that cannot close without verification evidence + approval); overpayments (restricted, with
-  legal/compliance review and the required disclaimer); guidance library + clarification
-  workflow with attorney-privilege separation; reports; audit-package generation with manifest
-  + checksums.
+- Guidance library + clarification workflow with attorney-privilege separation; reports;
+  audit-package generation with manifest + checksums; the remaining billing sub-tables wired to
+  UI (paymentAllocations, invoiceSubmissions surfaced), delivery attempts/amendment UI.
 - Phase 4: `formData` normalization backfill + reconciliation; retire direct-edit workflows;
   performance + authorization penetration testing; disaster-recovery drill; production adapters
   for Redis/queue/AV; full MFA enrollment UI + login enforcement; session-management table.
@@ -247,9 +251,9 @@ supports a Redis adapter for multi-instance correctness.
 | Restricted access logged | `documentAccessLog`, audit events on reveals/changes |
 | Cross-organization/-client IDOR | `assertClientAccess` + `rbac.test.ts` + designed org tests |
 | Units cannot be overconsumed | `authorizations.test.ts` (pure) + row-lock transaction |
-| Duplicate invoices cannot be created | idempotency keys + unique constraints (billing designed) |
-| Audit samples immutable after selection | snapshot/seed design (self-audit, Phase 3) |
-| Findings cannot close without verification | CAPA design (Phase 3) |
+| Duplicate invoices cannot be created | `billing.ts` idempotency key + `invoiceLines.idempotencyKey` UNIQUE; `billing.test.ts` |
+| Audit samples immutable after selection | `sampling.ts` seed + preserved snapshot; `verifySampleReproducible`; `sampling.test.ts` |
+| Findings cannot close without verification | `capa.ts` `canCloseFinding` + `store2.closeFinding`; `capa.test.ts` |
 | Audit events tamper-evident | `audit.test.ts` — tamper/delete/re-sign all detected |
 | Backup restoration tested | procedure documented (§12); drill is Phase 4 |
 | Rollback plan exists | §5 + `drizzle/manual/*.down.sql` |
@@ -321,11 +325,11 @@ Test suites added: `audit`, `authorizations`, `requirements`, `readiness`, `gate
 
 ## 14. Known limitations (explicit)
 
-- **Not implemented in code this release (designed only):** billing/reconciliation runtime,
-  service-delivery state machine, nutrition/clinical-approval runtime, self-audit/sampling/CAPA,
-  overpayments, guidance library, reports, audit-package generation, full MFA enrollment UI +
+- **Not implemented in code this release (designed only):** guidance library + clarification
+  workflow, reports, audit-package generation with manifest/checksums, full MFA enrollment UI +
   login-step enforcement, session-management table, `formData` normalization backfill, and the
-  `submissions → clients/enrollmentEpisodes` split.
+  `submissions → clients/enrollmentEpisodes` split. (Nutrition, service delivery, billing/
+  reconciliation, self-audit/sampling/CAPA, and overpayments are now implemented.)
 - **Infra is interface-first:** Redis, malware scanning, and the durable-job **worker loop** are
   abstractions with fail-safe defaults; production requires wiring the real adapters. Without a
   scanner, documents remain quarantined (safe) rather than downloadable.

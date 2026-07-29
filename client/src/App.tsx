@@ -35,6 +35,7 @@ import { ImpersonationBanner } from "./components/ImpersonationBanner";
 import ComplianceDashboard from "./pages/compliance/ComplianceDashboard";
 import RequirementsLibrary from "./pages/compliance/RequirementsLibrary";
 import ComplianceClientPanel from "./pages/compliance/ComplianceClientPanel";
+import AuditWorkspace from "./pages/compliance/AuditWorkspace";
 
 function Router() {
   usePageViewLogger();
@@ -70,6 +71,7 @@ function Router() {
       {/* Compliance & Audit module (feature-flagged; nav hidden unless enabled) */}
       <Route path={"/admin/compliance"} component={ComplianceDashboard} />
       <Route path={"/admin/compliance/requirements"} component={RequirementsLibrary} />
+      <Route path={"/admin/compliance/audits"} component={AuditWorkspace} />
       <Route path={"/admin/compliance/clients/:id"} component={ComplianceClientPanel} />
 
       {/* Referrer Portal */}
