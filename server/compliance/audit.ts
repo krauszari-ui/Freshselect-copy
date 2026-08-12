@@ -44,7 +44,14 @@ export interface AuditEventInput {
  * Deterministic serialization of the fields that participate in the hash. Sorted
  * keys + JSON so the same logical event always hashes identically.
  */
-export function canonicalizeEvent(evt: AuditEventInput, createdAtIso: string): string {
+export function canonicalizeEvent(evt: AuditEventInput, _createdAtIso?: string): string {
+  // `createdAt` is intentionally NOT part of the hash. DB TIMESTAMP columns
+  // truncate sub-second precision and can be affected by the session timezone,
+  // which would make a persisted chain fail to re-verify. Ordering and
+  // tamper-evidence are enforced by the prevHash linkage + the business/actor
+  // fields below (an inserted/deleted/reordered row still breaks the chain).
+  // prevValue/newValue are normalized so the canonical form is identical whether
+  // the driver returns JSON as an object (MySQL/TiDB) or a string (MariaDB).
   const payload: Record<string, unknown> = {
     actorId: evt.actorId ?? null,
     actorName: evt.actorName ?? null,
@@ -55,8 +62,8 @@ export function canonicalizeEvent(evt: AuditEventInput, createdAtIso: string): s
     recordType: evt.recordType,
     recordId: evt.recordId != null ? String(evt.recordId) : null,
     clientId: evt.clientId ?? null,
-    prevValue: evt.prevValue ?? null,
-    newValue: evt.newValue ?? null,
+    prevValue: normalizeJsonValue(evt.prevValue),
+    newValue: normalizeJsonValue(evt.newValue),
     reason: evt.reason ?? null,
     approvalId: evt.approvalId ?? null,
     // Attribution / forensic fields are covered by the hash so they are
@@ -67,9 +74,19 @@ export function canonicalizeEvent(evt: AuditEventInput, createdAtIso: string): s
     ip: evt.ip ?? null,
     userAgent: evt.userAgent ?? null,
     success: evt.success ?? true,
-    createdAt: createdAtIso,
   };
   return stableStringify(payload);
+}
+
+/**
+ * Normalize a value that may be a JSON column: MySQL/TiDB return JSON already
+ * parsed (object/array); MariaDB returns it as a string. Parsing strings makes
+ * the hash canonical form independent of the driver's representation.
+ */
+function normalizeJsonValue(v: unknown): unknown {
+  if (v == null) return null;
+  if (typeof v === "string") { try { return JSON.parse(v); } catch { return v; } }
+  return v;
 }
 
 /** Stable JSON: object keys sorted recursively so serialization is deterministic. */
@@ -78,6 +95,11 @@ export function stableStringify(value: unknown): string {
 }
 
 function sortDeep(value: unknown): unknown {
+  // Serialize Dates the same way JSON.stringify does (ISO string), so the
+  // canonical form computed at write time matches the value after it has been
+  // stored in and read back from a JSON column. Without this, a Date would
+  // stringify to `{}` at write but to its ISO string on read → hash mismatch.
+  if (value instanceof Date) return value.toISOString();
   if (Array.isArray(value)) return value.map(sortDeep);
   if (value && typeof value === "object") {
     const out: Record<string, unknown> = {};

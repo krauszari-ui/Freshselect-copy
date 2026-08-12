@@ -96,6 +96,37 @@ describe("audit hash chain", () => {
     expect(computeEventHash(canonical, null)).not.toBe(computeEventHash(canonical, "abc"));
   });
 
+  it("canonicalizes a Date the same as its ISO string (DB JSON round-trip safe)", () => {
+    // Regression: a Date in prev/newValue must hash identically whether it is a
+    // Date object (write time) or the ISO string it becomes after being stored in
+    // and read back from a JSON column. Previously `sortDeep` turned a Date into
+    // `{}`, so such events could never re-verify. (Caught by the live-DB E2E.)
+    const d = new Date("2026-08-12T02:02:56.221Z");
+    const asObject = canonicalizeEvent({ action: "x", recordType: "y", newValue: { dateOfService: d, units: 2 } });
+    const roundTripped = JSON.parse(JSON.stringify({ dateOfService: d, units: 2 }));
+    const asString = canonicalizeEvent({ action: "x", recordType: "y", newValue: roundTripped });
+    expect(asObject).toBe(asString);
+  });
+
+  it("hash is independent of createdAt (DB truncates sub-second precision)", () => {
+    const a = canonicalizeEvent({ action: "x", recordType: "y" }, "2026-01-01T00:00:00.123Z");
+    const b = canonicalizeEvent({ action: "x", recordType: "y" }, "2026-06-30T12:34:56.000Z");
+    expect(a).toBe(b);
+  });
+
+  it("a chain whose newValue holds a Date verifies after a simulated DB round-trip", () => {
+    const events: AuditEvent[] = [];
+    let prev: string | null = null;
+    for (let i = 1; i <= 3; i++) {
+      const e = makeEvent({ id: i, action: `d_${i}`, newValue: { when: new Date(`2026-0${i}-01T00:00:00.500Z`), n: i } }, prev);
+      // Simulate what the DB gives back: JSON column read as a parsed object with ISO strings.
+      e.newValue = JSON.parse(JSON.stringify(e.newValue));
+      events.push(e);
+      prev = e.hash;
+    }
+    expect(verifyAuditChain(events).ok).toBe(true);
+  });
+
   it("attribution/forensic fields are tamper-evident (actorName, ip, sessionId)", () => {
     const chain = buildChain(4);
     // actorName is covered by the hash → editing it breaks verification.
