@@ -6,6 +6,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { complianceRouter } from "./compliance/router";
+import { evaluateMfaLogin } from "./compliance/mfaService";
 import {
   createSubmission, getAllSubmissions, getSubmissionById, getSubmissionStats,
   listAllUsers, listSubmissions, listWorkers, listStaffUsers, setUserRole,
@@ -208,7 +209,7 @@ export const appRouter = router({
       return { dbConnected: !!db };
     }),
     adminLogin: publicProcedure
-      .input(z.object({ email: z.string().email(), password: z.string().min(1) }))
+      .input(z.object({ email: z.string().email(), password: z.string().min(1), mfaToken: z.string().max(64).optional() }))
       .mutation(async ({ ctx, input }) => {
         const ip = (ctx.req as any).ip ?? ctx.req.socket?.remoteAddress ?? "unknown";
         const user = await getUserByEmail(input.email);
@@ -252,6 +253,18 @@ export const appRouter = router({
         }
         // Clear failed-login counter on successful auth
         await clearFailedLogins(user.id);
+        // ── Second factor (compliance MFA) ──────────────────────────────────
+        // No-op unless COMPLIANCE_MFA is on, the role requires MFA, and the user
+        // has an active enrollment. Otherwise password alone completes login.
+        const mfaDecision = await evaluateMfaLogin(user, input.mfaToken);
+        if (mfaDecision === "required") {
+          await logAudit({ actorId: user.id, actorName: user.email ?? input.email, action: "mfa_challenge", details: { ip } });
+          return { success: false, mfaRequired: true, role: user.role } as const;
+        }
+        if (mfaDecision === "invalid") {
+          await logAudit({ actorId: user.id, actorName: user.email ?? input.email, action: "mfa_failed", details: { ip } });
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid authentication code" });
+        }
         // Generate a session UUID for activity grouping
         const sessionId = randomUUID();
         // Log successful login

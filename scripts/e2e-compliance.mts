@@ -22,6 +22,7 @@ import {
   submissions, serviceAuthorizations, complianceReadiness, auditFindings,
 } from "../drizzle/schema";
 import { loadAuditChain, verifyAuditChain } from "../server/compliance/audit";
+import { totp } from "../server/compliance/infra/mfa";
 import type { User } from "../drizzle/schema";
 
 // ─── Tiny assert harness ─────────────────────────────────────────────────────
@@ -268,6 +269,57 @@ async function main() {
   let pkgForbidden = false;
   try { await workerCaller.compliance.audits.generatePackage({ auditId: audit.id }); } catch { pkgForbidden = true; }
   ok(pkgForbidden, "worker without EXPORT cannot generate an audit package (server-enforced)");
+
+  console.log("\n══ Phase 12e: MFA enrollment + login-step enforcement ══");
+  // Enroll the super_admin in TOTP, then prove the login gate enforces it only
+  // when COMPLIANCE_MFA is on. The gate must be a strict no-op while off.
+  const mfaStatusBefore = await caller.compliance.mfa.status();
+  ok(!mfaStatusBefore.active, "admin has no active MFA before enrollment");
+  const enroll = await caller.compliance.mfa.start();
+  ok(/^[A-Z2-7]{16,}$/.test(enroll.secret) && enroll.otpauthUri.startsWith("otpauth://totp/"), "start() returns a base32 secret + otpauth URI");
+  const midStatus = await caller.compliance.mfa.status();
+  ok(midStatus.enrolled && !midStatus.active, "enrollment is pending (not active) until confirmed");
+  const confirmRes = await caller.compliance.mfa.confirm({ token: totp(enroll.secret) });
+  ok(Array.isArray(confirmRes.recoveryCodes) && confirmRes.recoveryCodes.length === 10, "confirm() activates MFA and returns 10 recovery codes");
+  const afterConfirm = await caller.compliance.mfa.status();
+  ok(afterConfirm.active, "MFA is active after confirmation");
+
+  // With the flag OFF, login must succeed WITHOUT a code (no behavior change).
+  delete process.env.COMPLIANCE_MFA;
+  const loginFlagOff = await caller.auth.adminLogin({ email: "a.krausz@levelupresources.org", password: "hatzlacha" });
+  ok(loginFlagOff.success === true, "flag OFF: password-only login still succeeds (MFA is a no-op)");
+
+  // Turn enforcement ON.
+  process.env.COMPLIANCE_MFA = "1";
+  const loginNoToken = await caller.auth.adminLogin({ email: "a.krausz@levelupresources.org", password: "hatzlacha" });
+  ok(loginNoToken.success === false && "mfaRequired" in loginNoToken && loginNoToken.mfaRequired === true, "flag ON: login without a code returns mfaRequired (no session issued)");
+
+  let wrongCodeRejected = false;
+  try { await caller.auth.adminLogin({ email: "a.krausz@levelupresources.org", password: "hatzlacha", mfaToken: "000000" }); }
+  catch { wrongCodeRejected = true; }
+  ok(wrongCodeRejected, "flag ON: an invalid code is rejected");
+
+  const loginGood = await caller.auth.adminLogin({ email: "a.krausz@levelupresources.org", password: "hatzlacha", mfaToken: totp(enroll.secret) });
+  ok(loginGood.success === true, "flag ON: a valid TOTP code completes login");
+
+  // A single-use recovery code also satisfies the gate, then cannot be reused.
+  const recovery = confirmRes.recoveryCodes[0];
+  const loginRecovery = await caller.auth.adminLogin({ email: "a.krausz@levelupresources.org", password: "hatzlacha", mfaToken: recovery });
+  ok(loginRecovery.success === true, "flag ON: a recovery code completes login");
+  let reuseRejected = false;
+  try { await caller.auth.adminLogin({ email: "a.krausz@levelupresources.org", password: "hatzlacha", mfaToken: recovery }); }
+  catch { reuseRejected = true; }
+  ok(reuseRejected, "flag ON: a spent recovery code cannot be reused");
+
+  // Reset flow: user requests, a DIFFERENT admin approves, enrollment clears.
+  await caller.compliance.mfa.requestReset();
+  await approverCaller.compliance.mfa.approveReset({ userId: (admin as User).id });
+  const afterReset = await caller.compliance.mfa.status();
+  ok(!afterReset.active, "after an approved reset MFA is inactive (user must re-enroll)");
+  // With MFA reset (no active enrollment), the gate can't enforce → login proceeds.
+  const loginAfterReset = await caller.auth.adminLogin({ email: "a.krausz@levelupresources.org", password: "hatzlacha" });
+  ok(loginAfterReset.success === true, "flag ON but no active enrollment: login proceeds (can't lock out an un-enrolled admin)");
+  delete process.env.COMPLIANCE_MFA; // leave enforcement off for any later phases
 
   console.log("\n══ Phase 13: audit-chain integrity ══");
   const chain = await loadAuditChain(db);

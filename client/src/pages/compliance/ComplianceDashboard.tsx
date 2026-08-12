@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
-import { ShieldCheck, ShieldAlert, BookOpen, BookMarked, BarChart3, Users, Loader2, CheckCircle2, XCircle, Info, Search } from "lucide-react";
+import { ShieldCheck, ShieldAlert, BookOpen, BookMarked, BarChart3, Users, Loader2, CheckCircle2, XCircle, Info, Search, KeyRound } from "lucide-react";
 
 /**
  * Executive compliance dashboard. Cards deep-link to the underlying records.
@@ -147,6 +147,21 @@ export default function ComplianceDashboard() {
               <CardContent className="text-sm text-slate-600">
                 Run self-audits with reproducible sampling; track findings and corrective actions
                 that cannot close without verification.
+              </CardContent>
+            </Card>
+          </Link>
+
+          {/* Two-factor authentication (self-service) */}
+          <Link href="/admin/compliance/mfa">
+            <Card className="hover:border-green-500 transition-colors cursor-pointer h-full">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <KeyRound className="h-4 w-4 text-green-700" aria-hidden="true" /> Two-factor authentication
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-slate-600">
+                Set up an authenticator app and recovery codes to protect your account. Required
+                for privileged roles when enforcement is enabled.
               </CardContent>
             </Card>
           </Link>

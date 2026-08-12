@@ -12,6 +12,12 @@ export default function AdminLogin() {
   const { user, loading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  // Second-factor step: when the server answers `mfaRequired`, we swap the
+  // password form for a 6–8 digit code entry and re-submit with the same
+  // credentials plus the token. Purely additive — never shown unless the
+  // server (COMPLIANCE_MFA on + enrolled privileged role) asks for it.
+  const [mfaRequired, setMfaRequired] = useState(false);
+  const [mfaToken, setMfaToken] = useState("");
 
   // Use window.location for all redirects — avoids React error #300 race condition
   // that occurs when navigate() and window.location.href fire simultaneously
@@ -36,6 +42,12 @@ export default function AdminLogin() {
 
   const loginMutation = trpc.auth.adminLogin.useMutation({
     onSuccess: (data) => {
+      // Server needs a second factor: surface the code-entry step and stop.
+      if ("mfaRequired" in data && data.mfaRequired) {
+        setMfaRequired(true);
+        toast.message("Enter your authentication code to continue.");
+        return;
+      }
       // For assessors: reload THIS page so auth.me resolves with the full user
       // object (including orgId). The useEffect above will then redirect to
       // /org (if orgId is set) or /assessor (if plain assessor). This avoids
@@ -54,7 +66,8 @@ export default function AdminLogin() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) return;
-    loginMutation.mutate({ email, password });
+    if (mfaRequired && !mfaToken) return;
+    loginMutation.mutate({ email, password, mfaToken: mfaRequired ? mfaToken : undefined });
   };
 
   if (loading) {
@@ -108,6 +121,7 @@ export default function AdminLogin() {
                     placeholder="admin@freshselectmeals.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    disabled={mfaRequired}
                     required
                   />
                 </div>
@@ -121,21 +135,42 @@ export default function AdminLogin() {
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    disabled={mfaRequired}
                     required
                   />
                 </div>
 
+                {mfaRequired && (
+                  <div className="space-y-2">
+                    <Label htmlFor="mfaToken">Authentication code</Label>
+                    <Input
+                      id="mfaToken"
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      placeholder="123456"
+                      value={mfaToken}
+                      onChange={(e) => setMfaToken(e.target.value.replace(/[^0-9a-fA-F-]/g, ""))}
+                      autoFocus
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Enter the 6-digit code from your authenticator app, or a recovery code.
+                    </p>
+                  </div>
+                )}
+
                 <Button
                   type="submit"
                   className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold h-11"
-                  disabled={loginMutation.isPending || !email || !password}
+                  disabled={loginMutation.isPending || !email || !password || (mfaRequired && !mfaToken)}
                 >
                   {loginMutation.isPending ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   ) : (
                     <ShieldCheck className="w-4 h-4 mr-2" />
                   )}
-                  {loginMutation.isPending ? "Signing in…" : "Sign In"}
+                  {loginMutation.isPending ? "Signing in…" : mfaRequired ? "Verify code" : "Sign In"}
                 </Button>
 
                 <div className="text-center">
