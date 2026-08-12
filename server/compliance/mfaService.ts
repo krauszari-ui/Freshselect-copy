@@ -16,6 +16,7 @@ import { recordAuditEvent } from "./audit";
 import { type Actor } from "./store";
 import { generateTotpSecret, verifyTotp, totpAuthUri, generateRecoveryCodes, hashRecoveryCode } from "./infra/mfa";
 import { isMfaRequired } from "./flags";
+import { revokeAllUserSessions } from "./sessionService";
 import { MFA_REQUIRED_LEGACY_ROLES, MFA_REQUIRED_COMPLIANCE_ROLES, type ComplianceRole } from "@shared/compliance/constants";
 
 async function complianceRoleKeys(userId: number): Promise<ComplianceRole[]> {
@@ -124,4 +125,6 @@ export async function approveReset(actor: Actor, targetUserId: number): Promise<
     await tx.delete(mfaRecoveryCodes).where(eq(mfaRecoveryCodes.userId, targetUserId));
     await recordAuditEvent(tx, { ...actor, action: "mfa_reset_approved", recordType: "mfaEnrollment", recordId: targetUserId });
   });
+  // Forced logout: a security-factor change terminates the target's sessions.
+  try { await revokeAllUserSessions(actor, targetUserId, "mfa_reset"); } catch { /* best-effort */ }
 }

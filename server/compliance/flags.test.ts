@@ -30,6 +30,6 @@ describe("compliance feature flags", () => {
 
   it("snapshot reflects current env", () => {
     process.env.COMPLIANCE_MODULE = "on";
-    expect(complianceFlagSnapshot()).toEqual({ module: true, gates: false, mfa: false });
+    expect(complianceFlagSnapshot()).toEqual({ module: true, gates: false, mfa: false, sessions: false });
   });
 });

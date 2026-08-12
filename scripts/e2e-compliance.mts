@@ -23,6 +23,11 @@ import {
 } from "../drizzle/schema";
 import { loadAuditChain, verifyAuditChain } from "../server/compliance/audit";
 import { totp } from "../server/compliance/infra/mfa";
+import {
+  recordSession, enforceSession, hasRecentReauth,
+  SESSION_IDLE_TIMEOUT_MS, SESSION_ABSOLUTE_TIMEOUT_MS,
+} from "../server/compliance/sessionService";
+import { randomUUID } from "node:crypto";
 import type { User } from "../drizzle/schema";
 
 // ─── Tiny assert harness ─────────────────────────────────────────────────────
@@ -47,10 +52,10 @@ function asArr(v: unknown): unknown[] {
 }
 
 // Build a tRPC context for a given user (fakes req/res the compliance procs read).
-function ctxFor(user: User) {
+function ctxFor(user: User, sessionId?: string) {
   return {
     user,
-    req: { headers: { cookie: "", "user-agent": "e2e" }, ip: "127.0.0.1", socket: { remoteAddress: "127.0.0.1" } },
+    req: { headers: { cookie: sessionId ? `admin_session_id=${sessionId}` : "", "user-agent": "e2e" }, ip: "127.0.0.1", socket: { remoteAddress: "127.0.0.1" } },
     res: { cookie() {}, clearCookie() {} },
   } as unknown as Parameters<typeof appRouter.createCaller>[0];
 }
@@ -320,6 +325,49 @@ async function main() {
   const loginAfterReset = await caller.auth.adminLogin({ email: "a.krausz@levelupresources.org", password: "hatzlacha" });
   ok(loginAfterReset.success === true, "flag ON but no active enrollment: login proceeds (can't lock out an un-enrolled admin)");
   delete process.env.COMPLIANCE_MFA; // leave enforcement off for any later phases
+
+  console.log("\n══ Phase 12f: session management (revocation, timeouts, reauth) ══");
+  // Record two sessions for the worker and prove the enforcement decisions.
+  const sidA = randomUUID();
+  const sidB = randomUUID();
+  await recordSession({ sessionId: sidA, userId: workerId, openId: (worker as User).openId, role: "worker", ip: "10.0.0.1", userAgent: "e2e-A" });
+  await recordSession({ sessionId: sidB, userId: workerId, openId: (worker as User).openId, role: "worker", ip: "10.0.0.2", userAgent: "e2e-B" });
+  const freshCheck = await enforceSession(sidA);
+  ok(freshCheck.ok, "a fresh session passes enforcement");
+  const nowT = Date.now();
+  const idleCheck = await enforceSession(sidA, nowT + SESSION_IDLE_TIMEOUT_MS + 60_000);
+  ok(!idleCheck.ok && idleCheck.reason === "idle", "a session idle past the window is rejected (idle)");
+  const expiredCheck = await enforceSession(sidA, nowT + SESSION_ABSOLUTE_TIMEOUT_MS + 60_000);
+  ok(!expiredCheck.ok && expiredCheck.reason === "expired", "a session past absolute expiry is rejected (expired)");
+
+  // The worker can list and revoke their OWN session; cross-user revoke is blocked.
+  const workerSessions = await workerCaller.compliance.sessions.list();
+  ok(workerSessions.length >= 2 && workerSessions.every((s) => "sessionId" in s), "worker lists their own sessions");
+  const revokeRes = await workerCaller.compliance.sessions.revoke({ sessionId: sidA });
+  ok(revokeRes.revoked, "worker revokes one of their own sessions");
+  const afterRevoke = await enforceSession(sidA);
+  ok(!afterRevoke.ok && afterRevoke.reason === "revoked", "a revoked session is rejected (revoked)");
+  let crossRevokeBlocked = false;
+  try { await workerCaller.compliance.sessions.revoke({ sessionId: randomUUID() }); } catch { crossRevokeBlocked = true; }
+  ok(crossRevokeBlocked, "revoking an unknown/foreign session is blocked (IDOR-guarded)");
+
+  // Admin forced-logout of the worker terminates the remaining session.
+  const forced = await caller.compliance.sessions.revokeForUser({ userId: workerId, reason: "e2e_offboard" });
+  ok(forced.count >= 1, "admin forced-logout revokes the worker's remaining session(s)");
+  const bCheck = await enforceSession(sidB);
+  ok(!bCheck.ok && bCheck.reason === "revoked", "the forced-logout target session is now revoked");
+
+  // Reauth for sensitive actions: stamps the current session; verifiable in-window.
+  const sidReauth = randomUUID();
+  await recordSession({ sessionId: sidReauth, userId: (admin as User).id, openId: (admin as User).openId, role: "super_admin", ip: "10.0.0.9", userAgent: "e2e-admin" });
+  const adminReauthCaller = appRouter.createCaller(ctxFor(admin as User, sidReauth));
+  ok(!(await hasRecentReauth(sidReauth)), "no recent reauth before the caller re-authenticates");
+  const reauthRes = await adminReauthCaller.compliance.sessions.reauth({ password: "hatzlacha" });
+  ok(reauthRes.ok === true, "reauth with the correct password succeeds");
+  ok(await hasRecentReauth(sidReauth), "reauth is recorded within the reauth window");
+  let badReauthRejected = false;
+  try { await adminReauthCaller.compliance.sessions.reauth({ password: "wrong-password" }); } catch { badReauthRejected = true; }
+  ok(badReauthRejected, "reauth with a wrong password is rejected");
 
   console.log("\n══ Phase 13: audit-chain integrity ══");
   const chain = await loadAuditChain(db);

@@ -20,6 +20,7 @@ import { encountersRouter, billingRouter, auditsRouter, nutritionRouter, overpay
 import { guidanceRouter } from "./routerGuidance";
 import { reportsRouter } from "./routerReports";
 import { mfaRouter } from "./routerMfa";
+import { sessionsRouter } from "./routerSessions";
 
 export const complianceRouter = router({
   /** Public: flag snapshot so the UI matches the server. */
@@ -34,6 +35,7 @@ export const complianceRouter = router({
   guidance: guidanceRouter,
   reports: reportsRouter,
   mfa: mfaRouter,
+  sessions: sessionsRouter,
 
   readiness: router({
     get: permProcedure(PERMISSIONS.READINESS_VIEW).input(submissionIdInput).query(async ({ input, ctx }) => {

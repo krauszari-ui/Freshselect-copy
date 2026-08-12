@@ -1767,3 +1767,38 @@ export const trainingAcknowledgments = mysqlTable("trainingAcknowledgments", {
   acknowledgedAt: timestamp("acknowledgedAt").defaultNow().notNull(),
 }, (t) => ({ uniq_trainingAcknowledgments: uniqueIndex("uniq_trainingAcknowledgments").on(t.internalDecisionId, t.userId) }));
 export type TrainingAcknowledgment = typeof trainingAcknowledgments.$inferSelect;
+
+// ─── Session management (server-side session records) ────────────────────────
+/**
+ * A durable record of every staff login session, keyed by the opaque session id
+ * stored in the `admin_session_id` cookie. Enables server-side revocation, a
+ * device/session list, idle + absolute timeout enforcement, reauth stamping for
+ * sensitive actions, and forced logout on role/password/MFA change. Enforced
+ * only when COMPLIANCE_SESSIONS is enabled (else purely observational / off).
+ */
+export const userSessions = mysqlTable("userSessions", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Opaque id shared with the client via the admin_session_id cookie. */
+  sessionId: varchar("sessionId", { length: 64 }).notNull(),
+  userId: int("userId").notNull().references(() => users.id),
+  /** Snapshots taken at login — used to detect drift and for display. */
+  openId: varchar("openId", { length: 128 }),
+  role: varchar("role", { length: 64 }),
+  ip: varchar("ip", { length: 64 }),
+  userAgent: varchar("userAgent", { length: 512 }),
+  mfaVerified: boolean("mfaVerified").notNull().default(false),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  lastSeenAt: timestamp("lastSeenAt").defaultNow().notNull(),
+  /** Absolute expiry (login + max lifetime). */
+  expiresAt: timestamp("expiresAt").notNull(),
+  /** Last successful re-authentication (for sensitive-action reauth windows). */
+  reauthAt: timestamp("reauthAt"),
+  revokedAt: timestamp("revokedAt"),
+  revokedBy: int("revokedBy").references(() => users.id),
+  revokeReason: varchar("revokeReason", { length: 128 }),
+}, (t) => ({
+  uniq_userSessions_sessionId: uniqueIndex("uniq_userSessions_sessionId").on(t.sessionId),
+  idx_userSessions_userId: index("idx_userSessions_userId").on(t.userId),
+  idx_userSessions_expiresAt: index("idx_userSessions_expiresAt").on(t.expiresAt),
+}));
+export type UserSession = typeof userSessions.$inferSelect;

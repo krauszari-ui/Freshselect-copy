@@ -39,6 +39,7 @@ import AuditWorkspace from "./pages/compliance/AuditWorkspace";
 import GuidanceLibrary from "./pages/compliance/GuidanceLibrary";
 import ComplianceReports from "./pages/compliance/ComplianceReports";
 import MfaSettings from "./pages/compliance/MfaSettings";
+import SessionSettings from "./pages/compliance/SessionSettings";
 
 function Router() {
   usePageViewLogger();
@@ -78,6 +79,7 @@ function Router() {
       <Route path={"/admin/compliance/guidance"} component={GuidanceLibrary} />
       <Route path={"/admin/compliance/reports"} component={ComplianceReports} />
       <Route path={"/admin/compliance/mfa"} component={MfaSettings} />
+      <Route path={"/admin/compliance/sessions"} component={SessionSettings} />
       <Route path={"/admin/compliance/clients/:id"} component={ComplianceClientPanel} />
 
       {/* Referrer Portal */}

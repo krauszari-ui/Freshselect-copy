@@ -15,6 +15,8 @@ export const COMPLIANCE_FLAGS = {
   GATES: "COMPLIANCE_GATES",
   /** Require MFA for privileged roles. */
   MFA: "COMPLIANCE_MFA",
+  /** Enforce server-side sessions (revocation, idle/absolute timeout, reauth). */
+  SESSIONS: "COMPLIANCE_SESSIONS",
 } as const;
 export type ComplianceFlag = (typeof COMPLIANCE_FLAGS)[keyof typeof COMPLIANCE_FLAGS];
 

@@ -7,6 +7,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { complianceRouter } from "./compliance/router";
 import { evaluateMfaLogin } from "./compliance/mfaService";
+import { recordSession, revokeSession, revokeAllUserSessions } from "./compliance/sessionService";
 import {
   createSubmission, getAllSubmissions, getSubmissionById, getSubmissionStats,
   listAllUsers, listSubmissions, listWorkers, listStaffUsers, setUserRole,
@@ -199,6 +200,16 @@ export const appRouter = router({
         const ip = (ctx.req as any).ip ?? ctx.req.socket?.remoteAddress ?? "unknown";
         const sessionId = parseCookieHeader(ctx.req.headers.cookie ?? "")?.[SESSION_ID_COOKIE] ?? null;
         await logAudit({ actorId: ctx.user.id, actorName: ctx.user.name ?? ctx.user.email ?? "Staff", action: "logout", details: { ip }, sessionId });
+        // Revoke the server-side session record so the (still-unexpired) JWT can't
+        // be reused. Best-effort — cookie clearing above is the primary logout.
+        if (sessionId) {
+          try {
+            await revokeSession(
+              { actorId: ctx.user.id, actorName: ctx.user.name ?? ctx.user.email ?? "Staff", actorRole: ctx.user.role, orgId: ctx.user.orgId ?? null, sessionId, originalActorId: null, ip, userAgent: ctx.req.headers["user-agent"] ?? null },
+              sessionId, "logout",
+            );
+          } catch (err) { console.warn("[Session] Failed to revoke on logout:", err); }
+        }
       }
       return { success: true } as const;
     }),
@@ -276,6 +287,17 @@ export const appRouter = router({
         const cookieOptions = getSessionCookieOptions(ctx.req);
         ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: SESSION_8H_MS });
         ctx.res.cookie(SESSION_ID_COOKIE, sessionId, { ...cookieOptions, maxAge: SESSION_8H_MS });
+        // Record a server-side session (enables revocation, device list, and
+        // idle/absolute timeout when COMPLIANCE_SESSIONS is on). Best-effort:
+        // a recording failure must never block a valid login.
+        try {
+          await recordSession({
+            sessionId, userId: user.id, openId: user.openId, role: user.role, ip,
+            userAgent: ctx.req.headers["user-agent"] ?? null, mfaVerified: mfaDecision === "ok",
+          });
+        } catch (err) {
+          console.warn("[Session] Failed to record session:", err);
+        }
         return { success: true, role: user.role } as const;
       }),
   }),
@@ -1912,6 +1934,15 @@ export const appRouter = router({
       const passwordHash = await bcrypt.hash(input.newPassword, 12);
       await clearPasswordResetToken(user.id, passwordHash);
       await logAudit({ actorId: user.id, actorName: user.email ?? "Staff", action: "password_reset", details: { method: "reset_link" } });
+      // Forced logout: a password change terminates all of this user's existing
+      // server-side sessions (defeats a stolen cookie surviving a reset). No-op
+      // if session records aren't in use.
+      try {
+        await revokeAllUserSessions(
+          { actorId: user.id, actorName: user.email ?? "Staff", actorRole: user.role, orgId: user.orgId ?? null, sessionId: null, originalActorId: null, ip: null, userAgent: null },
+          user.id, "password_reset",
+        );
+      } catch (err) { console.warn("[Session] Failed to revoke on password reset:", err); }
       return { success: true };
     }),
     validateToken: publicProcedure.input(z.object({ token: z.string() })).query(async ({ input }) => {

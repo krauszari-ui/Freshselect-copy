@@ -36,15 +36,22 @@ export function isMfaRequired(): boolean {
   return isComplianceModuleEnabled() && isFlagEnabled(COMPLIANCE_FLAGS.MFA);
 }
 
+export function areSessionsEnforced(): boolean {
+  // Server-side session enforcement only matters when the module is on.
+  return isComplianceModuleEnabled() && isFlagEnabled(COMPLIANCE_FLAGS.SESSIONS);
+}
+
 /** Snapshot of all flags — exposed to the client so the UI matches the server. */
 export function complianceFlagSnapshot(): {
   module: boolean;
   gates: boolean;
   mfa: boolean;
+  sessions: boolean;
 } {
   return {
     module: isComplianceModuleEnabled(),
     gates: areGatesEnforced(),
     mfa: isMfaRequired(),
+    sessions: areSessionsEnforced(),
   };
 }
