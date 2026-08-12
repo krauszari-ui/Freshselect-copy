@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Search, Plus, Loader2, ShieldAlert, CheckCircle2 } from "lucide-react";
+import { Search, Plus, Loader2, ShieldAlert, CheckCircle2, Download } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -56,13 +56,35 @@ export default function AuditWorkspace() {
                     <Badge variant={a.status === "closed" ? "default" : "outline"}>{a.status}</Badge>
                   </CardTitle>
                 </CardHeader>
-                {selected === a.id && <CardContent><AuditFindings auditId={a.id} /></CardContent>}
+                {selected === a.id && <CardContent className="space-y-3"><GeneratePackageButton auditId={a.id} /><AuditFindings auditId={a.id} /></CardContent>}
               </Card>
             ))}
           </div>
         </QueryStates>
       </div>
     </AdminLayout>
+  );
+}
+
+function GeneratePackageButton({ auditId }: { auditId: number }) {
+  const gen = trpc.compliance.audits.generatePackage.useMutation({
+    onSuccess: (pkg) => {
+      const bytes = Uint8Array.from(atob(pkg.pdfBase64), (c) => c.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+      const a = document.createElement("a");
+      a.href = url; a.download = pkg.filename; a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Audit package generated (${pkg.manifest.counts.findings} finding(s))`);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  return (
+    <div className="flex items-center justify-between rounded-md border bg-slate-50 px-3 py-2">
+      <span className="text-xs text-slate-600">Generate a professional PDF package (cover, scope, sampling, findings, financial analysis, certification, checksummed manifest).</span>
+      <Button size="sm" variant="outline" className="gap-1 shrink-0" disabled={gen.isPending} onClick={() => gen.mutate({ auditId })}>
+        {gen.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Download className="h-4 w-4" aria-hidden="true" />} Audit package
+      </Button>
+    </div>
   );
 }
 

@@ -9,6 +9,10 @@ import { PERMISSIONS } from "@shared/compliance/constants";
 import { permProcedure, actorFromCtx, assertClientAccess, submissionIdInput } from "./procedures";
 import * as ops from "./store2";
 import { OVERPAYMENT_DISCLAIMER } from "./capa";
+import { generateAuditPackage } from "./auditPackage";
+import { recordAuditEventStandalone } from "./audit";
+import { callerHasPermission } from "./procedures";
+import { TRPCError } from "@trpc/server";
 
 const encounterStateEnum = z.enum(["draft", "documented", "pending_review", "approved", "locked", "invoiced", "paid", "corrected_by_amendment", "voided"]);
 const testResultEnum = z.enum(["pass", "fail", "observation", "not_applicable", "insufficient_evidence", "pending_clarification"]);
@@ -154,6 +158,17 @@ export const auditsRouter = router({
   // Closing a finding requires the FINDING_CLOSE (compliance-approval) permission,
   // and the store enforces separation of duties + the full CAPA verification gate.
   closeFinding: permProcedure(PERMISSIONS.FINDING_CLOSE).input(z.object({ findingId: z.number().int().positive() })).mutation(({ input, ctx }) => ops.closeFinding(actorFromCtx(ctx), input.findingId)),
+  // Generate a professional audit package (PDF + checksummed manifest). Requires
+  // AUDIT_VIEW to reach here and EXPORT to actually export; generation is audited.
+  generatePackage: permProcedure(PERMISSIONS.AUDIT_VIEW).input(z.object({ auditId: z.number().int().positive() })).mutation(async ({ input, ctx }) => {
+    if (!(await callerHasPermission(ctx.user, PERMISSIONS.EXPORT))) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Missing permission: export:run" });
+    }
+    const pkg = await generateAuditPackage(input.auditId);
+    const actor = actorFromCtx(ctx);
+    await recordAuditEventStandalone({ ...actor, action: "audit_package_generated", recordType: "audit", recordId: input.auditId, newValue: { filename: pkg.filename, contentChecksum: pkg.manifest.contentChecksum, pdfChecksum: pkg.manifest.pdfChecksum } });
+    return pkg;
+  }),
 });
 
 export const nutritionRouter = router({

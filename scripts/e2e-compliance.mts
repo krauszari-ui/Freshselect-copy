@@ -256,6 +256,19 @@ async function main() {
   ok(exported.csv.startsWith("clientId,client,status,computedAt"), "CSV export has the expected header");
   ok(exported.filename.endsWith(".csv") && exported.rows >= 1, "CSV export names a file and reports row count");
 
+  console.log("\n══ Phase 12d: audit-package generation (PDF + checksummed manifest) ══");
+  const pkg = await caller.compliance.audits.generatePackage({ auditId: audit.id });
+  ok(pkg.filename.endsWith(".pdf"), "audit package produced a .pdf filename");
+  const pdfBuf = Buffer.from(pkg.pdfBase64, "base64");
+  ok(pdfBuf.length > 500 && pdfBuf.subarray(0, 5).toString() === "%PDF-", "package is a real PDF (magic %PDF-)");
+  ok(/^[0-9a-f]{64}$/.test(pkg.manifest.contentChecksum), "manifest has a content checksum");
+  ok(/^[0-9a-f]{64}$/.test(pkg.manifest.pdfChecksum ?? ""), "manifest has a PDF checksum");
+  ok(pkg.manifest.counts.findings >= 1, "manifest counts this run's finding");
+  // A worker (no EXPORT) must be blocked from generating a package.
+  let pkgForbidden = false;
+  try { await workerCaller.compliance.audits.generatePackage({ auditId: audit.id }); } catch { pkgForbidden = true; }
+  ok(pkgForbidden, "worker without EXPORT cannot generate an audit package (server-enforced)");
+
   console.log("\n══ Phase 13: audit-chain integrity ══");
   const chain = await loadAuditChain(db);
   const verify = verifyAuditChain(chain);
