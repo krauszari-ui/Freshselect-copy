@@ -17,6 +17,8 @@ export const COMPLIANCE_FLAGS = {
   MFA: "COMPLIANCE_MFA",
   /** Enforce server-side sessions (revocation, idle/absolute timeout, reauth). */
   SESSIONS: "COMPLIANCE_SESSIONS",
+  /** Enable the external vendor proof-of-delivery portal. */
+  VENDOR_PORTAL: "COMPLIANCE_VENDOR_PORTAL",
 } as const;
 export type ComplianceFlag = (typeof COMPLIANCE_FLAGS)[keyof typeof COMPLIANCE_FLAGS];
 

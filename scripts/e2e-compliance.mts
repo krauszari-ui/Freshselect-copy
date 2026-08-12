@@ -15,13 +15,14 @@
 import "dotenv/config";
 process.env.COMPLIANCE_MODULE = process.env.COMPLIANCE_MODULE ?? "1";
 
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { appRouter } from "../server/routers";
 import { getDb, getUserByEmail, createStaffUser } from "../server/db";
 import {
   submissions, serviceAuthorizations, complianceReadiness, auditFindings,
-  documents, complianceDocuments,
+  documents, complianceDocuments, organizations, users as usersTable, vendorPods,
 } from "../drizzle/schema";
+import { isoWeekStart } from "../shared/compliance/week";
 import { loadAuditChain, verifyAuditChain } from "../server/compliance/audit";
 import { totp } from "../server/compliance/infra/mfa";
 import {
@@ -521,6 +522,68 @@ async function main() {
   // Documents are scoped to the client — another client's folder does not leak them.
   const otherFolder = await caller.compliance.folder.list({ submissionId: otherSub[0].id });
   ok(!otherFolder.documents.some((d) => d.name === "Consent form.pdf"), "documents are scoped to their own client (no cross-client leak)");
+
+  console.log("\n══ Phase 12k: vendor portal + weekly proof-of-delivery ══");
+  // Two delivery-vendor orgs.
+  const vendorOrg = (await db.insert(organizations).values({ name: `E2E Vendor ${run}`, kind: "delivery_vendor" }).$returningId())[0].id;
+  const otherVendorOrg = (await db.insert(organizations).values({ name: `E2E Vendor2 ${run}`, kind: "delivery_vendor" }).$returningId())[0].id;
+  // A vendor user belonging to vendorOrg.
+  const vendorEmail = `e2e-vendor+${run}@example.com`;
+  const vendorUserId = await createStaffUser({ email: vendorEmail, name: "E2E Vendor User", passwordHash: null, role: "worker", permissions: {} });
+  await db.update(usersTable).set({ orgId: vendorOrg }).where(eq(usersTable.id, vendorUserId));
+  const vendorUser = await getUserByEmail(vendorEmail);
+  ok(!!vendorUser && vendorUser.orgId === vendorOrg, "vendor user created and bound to the vendor org");
+
+  // Three clients: active+unassigned, active+assigned-elsewhere, and inactive.
+  const mkClient = async (suffix: string, stage: string, assigned: number | null) =>
+    (await db.insert(submissions).values({
+      referenceNumber: `V${suffix}-${run}`.slice(0, 16), firstName: "Active", lastName: suffix,
+      email: `v${suffix}+${run}@example.com`, cellPhone: "5550000009", medicaidId: `V${suffix}${run}`.slice(0, 32),
+      supermarket: "M", formData: {}, hipaaConsentAt: new Date(), stage: stage as "level_2_active", assignedVendorOrgId: assigned,
+    }).$returningId())[0].id;
+  const activeA = await mkClient("A", "level_2_active", null);
+  const activeB = await mkClient("B", "level_2_active", otherVendorOrg);
+  const inactiveC = await mkClient("C", "referral", null);
+
+  const weekOf = isoWeekStart(new Date());
+  const vendorCaller = appRouter.createCaller(ctxFor(vendorUser as User));
+
+  // Flag OFF → the portal is closed.
+  delete process.env.COMPLIANCE_VENDOR_PORTAL;
+  let portalClosed = false;
+  try { await vendorCaller.compliance.vendor.myVendor(); } catch { portalClosed = true; }
+  ok(portalClosed, "flag OFF: the vendor portal is closed");
+
+  // Flag ON.
+  process.env.COMPLIANCE_VENDOR_PORTAL = "1";
+  const myVendor = await vendorCaller.compliance.vendor.myVendor();
+  ok(myVendor.id === vendorOrg, "vendor sees their own org");
+  ok((await caller.auth.me())?.orgKind == null, "an internal admin has no vendor orgKind");
+  ok((await vendorCaller.auth.me())?.orgKind === "delivery_vendor", "the vendor account reports orgKind=delivery_vendor (drives portal routing)");
+
+  const week = await vendorCaller.compliance.vendor.weeklyClients({ weekOf });
+  const weekIds = week.map((c) => c.submissionId);
+  ok(weekIds.includes(activeA), "weekly list includes an active, unassigned client");
+  ok(!weekIds.includes(activeB), "weekly list excludes a client assigned to another vendor");
+  ok(!weekIds.includes(inactiveC), "weekly list excludes a non-active client");
+  ok(week.find((c) => c.submissionId === activeA)?.pod == null, "no proof on file yet for the active client");
+  // Minimal-info guarantee: no medicaid/eligibility fields leak into the vendor view.
+  ok(!("medicaidId" in (week[0] ?? {})) && !("email" in (week[0] ?? {})), "vendor client rows carry no PHI beyond name + location");
+
+  const sub1 = await vendorCaller.compliance.vendor.submitPod({ submissionId: activeA, weekOf, podUrl: "https://example.com/pod/a-week1.jpg", podMethod: "photo" });
+  ok(sub1.created, "vendor submits a proof-of-delivery link for the week");
+  const week2 = await vendorCaller.compliance.vendor.weeklyClients({ weekOf });
+  ok(week2.find((c) => c.submissionId === activeA)?.pod?.podUrl?.includes("a-week1"), "the submitted PoD is now shown on the weekly list");
+
+  const sub2 = await vendorCaller.compliance.vendor.submitPod({ submissionId: activeA, weekOf, podUrl: "https://example.com/pod/a-week1-v2.jpg" });
+  ok(!sub2.created, "re-submitting the same client+week replaces (does not duplicate) the proof");
+  const podCount = await db.select().from(vendorPods).where(and(eq(vendorPods.submissionId, activeA), eq(vendorPods.vendorOrgId, vendorOrg), eq(vendorPods.weekOf, weekOf)));
+  ok(podCount.length === 1, "exactly one PoD row exists per client per vendor per week (idempotent)");
+
+  let notDeliverable = false;
+  try { await vendorCaller.compliance.vendor.submitPod({ submissionId: activeB, weekOf, podUrl: "https://example.com/pod/b.jpg" }); } catch { notDeliverable = true; }
+  ok(notDeliverable, "a vendor cannot submit proof for a client on another vendor's list");
+  delete process.env.COMPLIANCE_VENDOR_PORTAL;
 
   console.log("\n══ Phase 13: audit-chain integrity ══");
   const chain = await loadAuditChain(db);

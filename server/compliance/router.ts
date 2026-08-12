@@ -25,6 +25,7 @@ import { sessionsRouter } from "./routerSessions";
 import { breakGlassRouter, notificationsRouter } from "./routerSecurity";
 import { jobsRouter } from "./routerJobs";
 import { normalizationRouter } from "./routerNormalization";
+import { vendorRouter } from "./routerVendor";
 
 export const complianceRouter = router({
   /** Public: flag snapshot so the UI matches the server. */
@@ -44,6 +45,7 @@ export const complianceRouter = router({
   notifications: notificationsRouter,
   jobs: jobsRouter,
   normalization: normalizationRouter,
+  vendor: vendorRouter,
 
   /** Per-client audit folder — all documents unified from every source. */
   folder: router({

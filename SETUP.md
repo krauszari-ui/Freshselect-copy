@@ -63,6 +63,7 @@ This applies the committed migrations (`drizzle/0000_*.sql` … `0036_*.sql`).
   mysql "$DATABASE_URL" < drizzle/manual/0040_compliance_sessions.sql
   mysql "$DATABASE_URL" < drizzle/manual/0041_compliance_notifications.sql
   mysql "$DATABASE_URL" < drizzle/manual/0042_compliance_normalization.sql
+  mysql "$DATABASE_URL" < drizzle/manual/0043_vendor_pod.sql
   ```
 - **or** let Drizzle generate + apply them from the schema:
   ```bash

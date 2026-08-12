@@ -191,7 +191,17 @@ export const appRouter = router({
   system: systemRouter,
   compliance: complianceRouter,
   auth: router({
-    me: publicProcedure.query((opts) => opts.ctx.user),
+    me: publicProcedure.query(async ({ ctx }) => {
+      const user = ctx.user;
+      if (!user) return null;
+      // Attach the org "kind" so the client can route delivery-vendor users to
+      // the vendor portal. Only hits the DB for org-affiliated accounts.
+      let orgKind: string | null = null;
+      if (user.orgId != null) {
+        try { orgKind = (await getOrganizationById(user.orgId))?.kind ?? null; } catch { /* non-fatal */ }
+      }
+      return { ...user, orgKind };
+    }),
     logout: publicProcedure.mutation(async ({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
@@ -2435,6 +2445,7 @@ export const appRouter = router({
         contactPhone: z.string().optional().nullable(),
         notes: z.string().optional().nullable(),
         isActive: z.number().optional(),
+        kind: z.enum(["referral_agency", "delivery_vendor", "other"]).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const { id, ...data } = input;
@@ -2454,6 +2465,20 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         await assignUserToOrg(input.userId, input.orgId);
         await logAudit({ actorId: ctx.user.id, actorName: ctx.user.name ?? ctx.user.email ?? "Staff", action: "org_user_assigned", details: { userId: input.userId, orgId: input.orgId } }).catch(() => {});
+        return { success: true };
+      }),
+
+    /** Assign (or clear) the delivery vendor org responsible for a client. */
+    assignVendor: adminProcedure
+      .input(z.object({ submissionId: z.number(), vendorOrgId: z.number().nullable() }))
+      .mutation(async ({ ctx, input }) => {
+        const { getDb } = await import("./db");
+        const { submissions } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        await db.update(submissions).set({ assignedVendorOrgId: input.vendorOrgId }).where(eq(submissions.id, input.submissionId));
+        await logAudit({ actorId: ctx.user.id, actorName: ctx.user.name ?? ctx.user.email ?? "Staff", action: "vendor_assigned", details: { submissionId: input.submissionId, vendorOrgId: input.vendorOrgId } }).catch(() => {});
         return { success: true };
       }),
 

@@ -25,10 +25,14 @@ export default function AdminLogin() {
     if (!loading && user) {
       const staffRoles = ["admin", "worker", "super_admin", "viewer", "assessor"];
       if (staffRoles.includes(user.role)) {
-        // Org staff (any role with an orgId set) go to the org portal
+        // Org staff (any role with an orgId set) go to the org portal;
+        // delivery-vendor orgs go to the vendor proof-of-delivery portal.
         const orgId = (user as any).orgId;
+        const orgKind = (user as any).orgKind;
         let dest: string;
-        if (orgId) {
+        if (orgId && orgKind === "delivery_vendor") {
+          dest = "/vendor";
+        } else if (orgId) {
           dest = "/org";
         } else if (user.role === "assessor") {
           dest = "/assessor";

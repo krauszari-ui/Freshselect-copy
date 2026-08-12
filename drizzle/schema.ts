@@ -119,6 +119,12 @@ export const submissions = mysqlTable("submissions", {
   referredOrgAt: timestamp("referredOrgAt"),
   /** Admin note explaining why this client was referred to this org */
   referredOrgNote: text("referredOrgNote"),
+  /**
+   * Delivery vendor org assigned to this client (null = no specific vendor).
+   * Kept separate from referredOrgId (which drives assessor visibility) so the
+   * vendor proof-of-delivery portal scopes independently of referral routing.
+   */
+  assignedVendorOrgId: int("assignedVendorOrgId"),
   /** Soft-delete: true = client marked as 'Not Interested', hidden from main list */
   notInterested: boolean("notInterested").default(false).notNull(),
   /** When the client was marked as Not Interested */
@@ -543,6 +549,12 @@ export const organizations = mysqlTable("organizations", {
   contactPhone: varchar("contactPhone", { length: 64 }),
   /** Internal admin notes about this org */
   notes: text("notes"),
+  /**
+   * What kind of external partner this org is. `referral_agency` is the legacy
+   * default (assessor/referrer orgs); `delivery_vendor` unlocks the vendor
+   * proof-of-delivery portal. Additive — existing orgs default to referral_agency.
+   */
+  kind: mysqlEnum("kind", ["referral_agency", "delivery_vendor", "other"]).notNull().default("referral_agency"),
   /** Whether this org is active (soft-delete) */
   isActive: int("isActive").default(1).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -1856,3 +1868,36 @@ export const submissionNormalized = mysqlTable("submissionNormalized", {
   idx_submissionNormalized_medicaid: index("idx_submissionNormalized_medicaidIdNormalized").on(t.medicaidIdNormalized),
 }));
 export type SubmissionNormalized = typeof submissionNormalized.$inferSelect;
+
+// ─── Vendor weekly proof-of-delivery ─────────────────────────────────────────
+/**
+ * One proof-of-delivery record per client per delivery vendor per ISO week.
+ * A delivery vendor logs into the vendor portal, sees the week's approved
+ * clients, and attaches a PoD link (or an uploaded file). Staff see these in the
+ * client's Audit Folder grouped by week; missing weeks are flagged. `weekOf` is
+ * the Monday (UTC) of the ISO week the proof covers.
+ */
+export const vendorPods = mysqlTable("vendorPods", {
+  id: int("id").autoincrement().primaryKey(),
+  submissionId: int("submissionId").notNull().references(() => submissions.id),
+  vendorOrgId: int("vendorOrgId").notNull().references(() => organizations.id),
+  /** Monday (UTC) of the ISO week this proof covers. */
+  weekOf: timestamp("weekOf").notNull(),
+  /** The proof link the vendor supplied (an external URL), if any. */
+  podUrl: varchar("podUrl", { length: 1024 }),
+  /** Or an uploaded proof file in the compliance document store. */
+  documentId: int("documentId").references(() => complianceDocuments.id),
+  podMethod: mysqlEnum("podMethod", ["signature", "photo", "gps", "recipient_confirmation", "staff_attestation"]),
+  note: text("note"),
+  status: mysqlEnum("status", ["submitted", "verified", "rejected"]).notNull().default("submitted"),
+  uploadedBy: int("uploadedBy").references(() => users.id),
+  verifiedBy: int("verifiedBy").references(() => users.id),
+  verifiedAt: timestamp("verifiedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => ({
+  uniq_vendorPods_client_vendor_week: uniqueIndex("uniq_vendorPods_client_vendor_week").on(t.submissionId, t.vendorOrgId, t.weekOf),
+  idx_vendorPods_submissionId: index("idx_vendorPods_submissionId").on(t.submissionId),
+  idx_vendorPods_vendorOrgId_weekOf: index("idx_vendorPods_vendorOrgId_weekOf").on(t.vendorOrgId, t.weekOf),
+}));
+export type VendorPod = typeof vendorPods.$inferSelect;

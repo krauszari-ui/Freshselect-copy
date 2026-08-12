@@ -40,7 +40,7 @@ export default function AdminOrganizations() {
   });
 
   // ── Edit org ─────────────────────────────────────────────────────────────────
-  const [editOrg, setEditOrg] = useState<null | { id: number; name: string; contactEmail?: string | null; contactPhone?: string | null; notes?: string | null; isActive: number }>(null);
+  const [editOrg, setEditOrg] = useState<null | { id: number; name: string; contactEmail?: string | null; contactPhone?: string | null; notes?: string | null; isActive: number; kind?: string }>(null);
   const updateOrg = trpc.org.update.useMutation({
     onSuccess: () => {
       utils.org.list.invalidate();
@@ -126,9 +126,12 @@ export default function AdminOrganizations() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={org.isActive ? "default" : "secondary"}>
-                        {org.isActive ? "Active" : "Inactive"}
-                      </Badge>
+                      <div className="flex flex-col items-start gap-1">
+                        <Badge variant={org.isActive ? "default" : "secondary"}>
+                          {org.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                        {org.kind === "delivery_vendor" && <Badge variant="outline">Delivery vendor</Badge>}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
@@ -211,10 +214,22 @@ export default function AdminOrganizations() {
                   </SelectContent>
                 </Select>
               </div>
+              <div>
+                <label className="text-sm font-medium">Organization type</label>
+                <Select value={editOrg.kind ?? "referral_agency"} onValueChange={(v) => setEditOrg((o) => o ? { ...o, kind: v } : o)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="referral_agency">Referral agency</SelectItem>
+                    <SelectItem value="delivery_vendor">Delivery vendor</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">Delivery vendors get the weekly proof-of-delivery portal.</p>
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setEditOrg(null)}>Cancel</Button>
-              <Button disabled={updateOrg.isPending} onClick={() => updateOrg.mutate({ id: editOrg.id, name: editOrg.name, contactEmail: editOrg.contactEmail, contactPhone: editOrg.contactPhone, notes: editOrg.notes, isActive: editOrg.isActive })}>
+              <Button disabled={updateOrg.isPending} onClick={() => updateOrg.mutate({ id: editOrg.id, name: editOrg.name, contactEmail: editOrg.contactEmail, contactPhone: editOrg.contactPhone, notes: editOrg.notes, isActive: editOrg.isActive, kind: editOrg.kind as "referral_agency" | "delivery_vendor" | "other" | undefined })}>
                 {updateOrg.isPending ? "Saving…" : "Save Changes"}
               </Button>
             </DialogFooter>

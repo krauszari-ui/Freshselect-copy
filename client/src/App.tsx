@@ -30,6 +30,7 @@ import AdminChatInbox from "./pages/AdminChatInbox";
 import AdminOrganizations from "./pages/AdminOrganizations";
 import AdminOrgChats from "./pages/AdminOrgChats";
 import OrgPortal from "./pages/OrgPortal";
+import VendorPortal from "./pages/VendorPortal";
 import OrgNotifications from "./pages/OrgNotifications";
 import { ImpersonationBanner } from "./components/ImpersonationBanner";
 import ComplianceDashboard from "./pages/compliance/ComplianceDashboard";
@@ -93,6 +94,7 @@ function Router() {
 
       {/* Organization Portal */}
       <Route path={"/org"} component={OrgPortal} />
+      <Route path={"/vendor"} component={VendorPortal} />
       <Route path={"/org/clients/:id"} component={AdminClientDetail} />
       <Route path={"/org/notifications"} component={OrgNotifications} />
 

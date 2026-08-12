@@ -41,17 +41,23 @@ export function areSessionsEnforced(): boolean {
   return isComplianceModuleEnabled() && isFlagEnabled(COMPLIANCE_FLAGS.SESSIONS);
 }
 
+export function isVendorPortalEnabled(): boolean {
+  return isComplianceModuleEnabled() && isFlagEnabled(COMPLIANCE_FLAGS.VENDOR_PORTAL);
+}
+
 /** Snapshot of all flags — exposed to the client so the UI matches the server. */
 export function complianceFlagSnapshot(): {
   module: boolean;
   gates: boolean;
   mfa: boolean;
   sessions: boolean;
+  vendorPortal: boolean;
 } {
   return {
     module: isComplianceModuleEnabled(),
     gates: areGatesEnforced(),
     mfa: isMfaRequired(),
     sessions: areSessionsEnforced(),
+    vendorPortal: isVendorPortalEnabled(),
   };
 }
