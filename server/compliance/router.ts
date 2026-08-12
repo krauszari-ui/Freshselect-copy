@@ -18,6 +18,9 @@ import { loadAuditChain, verifyAuditChain, getEventsForRecord } from "./audit";
 import { permProcedure, actorFromCtx, assertClientAccess, submissionIdInput, callerHasPermission } from "./procedures";
 import { getClientFolder } from "./folder";
 import { listWeeklyPodForClient } from "./pod";
+import { generateClientFolderPdf } from "./clientFolder";
+import { recordAuditEventStandalone } from "./audit";
+import { TRPCError } from "@trpc/server";
 import { encountersRouter, billingRouter, auditsRouter, nutritionRouter, overpaymentsRouter } from "./routerOps";
 import { guidanceRouter } from "./routerGuidance";
 import { reportsRouter } from "./routerReports";
@@ -59,6 +62,17 @@ export const complianceRouter = router({
     weeklyPod: permProcedure(PERMISSIONS.DOCUMENT_VIEW).input(submissionIdInput).query(async ({ input, ctx }) => {
       await assertClientAccess(ctx.user, input.submissionId);
       return listWeeklyPodForClient(input.submissionId);
+    }),
+    /** Generate the PDF dossier (documents index + weekly PoD + checksummed manifest). */
+    generatePdf: permProcedure(PERMISSIONS.DOCUMENT_VIEW).input(submissionIdInput).mutation(async ({ input, ctx }) => {
+      await assertClientAccess(ctx.user, input.submissionId);
+      if (!(await callerHasPermission(ctx.user, PERMISSIONS.EXPORT))) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Missing permission: export:run" });
+      }
+      const includePrivileged = await callerHasPermission(ctx.user, PERMISSIONS.PRIVILEGED_VIEW);
+      const pkg = await generateClientFolderPdf(input.submissionId, { includePrivileged });
+      await recordAuditEventStandalone({ ...actorFromCtx(ctx), action: "client_folder_exported", recordType: "submission", recordId: input.submissionId, clientId: input.submissionId, newValue: { format: "pdf", filename: pkg.filename, contentChecksum: pkg.manifest.contentChecksum, pdfChecksum: pkg.manifest.pdfChecksum } });
+      return { filename: pkg.filename, pdfBase64: Buffer.from(pkg.pdfBytes).toString("base64"), manifest: pkg.manifest };
     }),
   }),
 

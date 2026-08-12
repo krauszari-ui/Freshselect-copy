@@ -32,6 +32,8 @@ import {
 import { randomUUID } from "node:crypto";
 import { enqueueJob } from "../server/compliance/infra/jobQueue";
 import { drainQueue } from "../server/compliance/worker";
+import { generateClientFolderZip } from "../server/compliance/clientFolder";
+import { unzipSync, strFromU8 } from "fflate";
 import type { User } from "../drizzle/schema";
 
 // ─── Tiny assert harness ─────────────────────────────────────────────────────
@@ -602,6 +604,34 @@ async function main() {
   const missingReport = await caller.compliance.reports.run({ key: "missing_pod" });
   ok(missingReport.rows.some((r) => r.clientId === activeB), "the missing_pod report lists an active client with no recent proof");
   ok(!missingReport.rows.some((r) => r.clientId === inactiveC), "the missing_pod report excludes non-active clients");
+
+  console.log("\n══ Phase 12m: downloadable audit folder (PDF + ZIP) ══");
+  // PDF dossier via tRPC (admin holds EXPORT).
+  const folderPdf = await caller.compliance.folder.generatePdf({ submissionId });
+  ok(folderPdf.filename.endsWith(".pdf"), "client folder PDF has a .pdf filename");
+  const fpdf = Buffer.from(folderPdf.pdfBase64, "base64");
+  ok(fpdf.length > 500 && fpdf.subarray(0, 5).toString() === "%PDF-", "client folder is a real PDF (magic %PDF-)");
+  ok(/^[0-9a-f]{64}$/.test(folderPdf.manifest.contentChecksum) && /^[0-9a-f]{64}$/.test(folderPdf.manifest.pdfChecksum ?? ""), "PDF manifest carries content + pdf checksums");
+  ok(folderPdf.manifest.counts.documents >= 4, "PDF manifest counts this client's documents");
+
+  // A worker without EXPORT cannot generate the download.
+  let pdfForbidden = false;
+  try { await workerCaller.compliance.folder.generatePdf({ submissionId }); } catch { pdfForbidden = true; }
+  ok(pdfForbidden, "a user without EXPORT cannot generate the folder download (server-enforced)");
+
+  // ZIP of the actual files (files unfetchable without storage → listed as unavailable,
+  // but the archive is still valid and contains the dossier + index + manifest).
+  const zip = await generateClientFolderZip(submissionId, { includePrivileged: true });
+  ok(zip.filename.endsWith(".zip"), "client folder ZIP has a .zip filename");
+  const entries = unzipSync(zip.zipBytes);
+  const entryNames = Object.keys(entries);
+  ok(entryNames.includes("audit-folder.pdf"), "ZIP contains the PDF dossier");
+  ok(entryNames.includes("index.csv") && entryNames.includes("manifest.json"), "ZIP contains an index and a manifest");
+  ok(Buffer.from(entries["audit-folder.pdf"]).subarray(0, 5).toString() === "%PDF-", "the ZIP's embedded dossier is a real PDF");
+  const manifestJson = JSON.parse(strFromU8(entries["manifest.json"]));
+  ok(manifestJson.submissionId === submissionId && /^[0-9a-f]{64}$/.test(manifestJson.contentChecksum), "ZIP manifest.json is well-formed and checksummed");
+  ok(strFromU8(entries["index.csv"]).startsWith("index,name,source"), "ZIP index.csv has the expected header");
+  ok(zip.included + zip.unavailable >= 4, "ZIP index accounts for every document (included or unavailable)");
 
   console.log("\n══ Phase 13: audit-chain integrity ══");
   const chain = await loadAuditChain(db);

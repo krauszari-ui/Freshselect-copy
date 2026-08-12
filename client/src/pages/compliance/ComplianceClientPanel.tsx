@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ReadinessBadge } from "./readinessBadge";
 import { maskIdentifier } from "@shared/compliance/constants";
-import { ArrowLeft, Loader2, RefreshCw, Plus, ShieldAlert, FolderOpen, FileText, ExternalLink, Truck, CheckCircle2, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Loader2, RefreshCw, Plus, ShieldAlert, FolderOpen, FileText, ExternalLink, Truck, CheckCircle2, AlertTriangle, Download, FileArchive } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useOpenDocument } from "@/hooks/useOpenDocument";
@@ -416,7 +416,7 @@ function AuditFolderTab({ submissionId }: { submissionId: number }) {
     <>
     <SectionShell
       title={`Audit folder${counts ? ` — ${counts.total} document${counts.total === 1 ? "" : "s"}` : ""}`}
-      action={<span className="flex items-center gap-1 text-xs text-slate-500"><FolderOpen className="h-4 w-4 text-green-700" aria-hidden="true" /> All documents for this client</span>}
+      action={<FolderDownloads submissionId={submissionId} />}
     >
       {docs.length === 0 ? (
         <p className="text-sm text-slate-500">No documents on file for this client yet.</p>
@@ -453,6 +453,30 @@ function AuditFolderTab({ submissionId }: { submissionId: number }) {
     </SectionShell>
     <WeeklyPodSection submissionId={submissionId} />
     </>
+  );
+}
+
+/** Download the whole folder as a PDF dossier or a ZIP of the actual files. */
+function FolderDownloads({ submissionId }: { submissionId: number }) {
+  const genPdf = trpc.compliance.folder.generatePdf.useMutation({
+    onSuccess: (pkg) => {
+      const bytes = Uint8Array.from(atob(pkg.pdfBase64), (c) => c.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+      const a = document.createElement("a"); a.href = url; a.download = pkg.filename; a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Audit folder PDF generated");
+    },
+    onError: (e) => toast.error(e.message.includes("export:run") ? "You do not have export permission." : e.message),
+  });
+  return (
+    <div className="flex items-center gap-1.5">
+      <Button size="sm" variant="outline" className="gap-1" disabled={genPdf.isPending} onClick={() => genPdf.mutate({ submissionId })}>
+        {genPdf.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Download className="h-4 w-4" aria-hidden="true" />} PDF
+      </Button>
+      <Button size="sm" variant="outline" className="gap-1" onClick={() => window.open(`/api/compliance/client-folder/${submissionId}.zip`, "_blank")}>
+        <FileArchive className="h-4 w-4" aria-hidden="true" /> ZIP
+      </Button>
+    </div>
   );
 }
 

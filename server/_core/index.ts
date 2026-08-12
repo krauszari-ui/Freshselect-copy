@@ -446,6 +446,52 @@ async function startServer() {
     }
   });
 
+  // ─── Client audit-folder download (PDF dossier + ZIP of files) ────────────
+  // Authenticated binary download — large ZIPs of real files exceed the tRPC
+  // JSON body limit, so they stream through Express instead. Session-cookie
+  // authenticated, per-client access-checked, and EXPORT-permission gated.
+  app.get("/api/compliance/client-folder/:file", async (req, res) => {
+    try {
+      const m = /^(\d+)\.(zip|pdf)$/.exec(req.params.file ?? "");
+      if (!m) { res.status(400).json({ ok: false, error: "Bad request" }); return; }
+      const submissionId = Number(m[1]);
+      const fmt = m[2];
+      const user = await sdk.authenticateRequest(req).catch(() => null);
+      if (!user) { res.status(401).json({ ok: false, error: "Authentication required" }); return; }
+
+      const { isComplianceModuleEnabled } = await import("../compliance/flags");
+      if (!isComplianceModuleEnabled()) { res.status(404).json({ ok: false, error: "Not found" }); return; }
+      const { assertClientAccess, callerHasPermission } = await import("../compliance/procedures");
+      const { PERMISSIONS } = await import("@shared/compliance/constants");
+      await assertClientAccess(user as any, submissionId); // throws NOT_FOUND / FORBIDDEN
+      if (!(await callerHasPermission(user as any, PERMISSIONS.EXPORT))) {
+        res.status(403).json({ ok: false, error: "Missing permission: export:run" });
+        return;
+      }
+      const includePrivileged = await callerHasPermission(user as any, PERMISSIONS.PRIVILEGED_VIEW);
+      const { generateClientFolderPdf, generateClientFolderZip } = await import("../compliance/clientFolder");
+      const { recordAuditEventStandalone } = await import("../compliance/audit");
+      const actor = { actorId: (user as any).id, actorName: (user as any).name ?? (user as any).email ?? "Staff", actorRole: (user as any).role, orgId: (user as any).orgId ?? null };
+
+      if (fmt === "zip") {
+        const pkg = await generateClientFolderZip(submissionId, { includePrivileged });
+        await recordAuditEventStandalone({ ...actor, action: "client_folder_exported", recordType: "submission", recordId: String(submissionId), clientId: submissionId, newValue: { format: "zip", included: pkg.included, unavailable: pkg.unavailable, contentChecksum: pkg.manifest.contentChecksum } });
+        res.setHeader("Content-Type", "application/zip");
+        res.setHeader("Content-Disposition", `attachment; filename="${pkg.filename}"`);
+        res.send(Buffer.from(pkg.zipBytes));
+      } else {
+        const pkg = await generateClientFolderPdf(submissionId, { includePrivileged });
+        await recordAuditEventStandalone({ ...actor, action: "client_folder_exported", recordType: "submission", recordId: String(submissionId), clientId: submissionId, newValue: { format: "pdf", contentChecksum: pkg.manifest.contentChecksum, pdfChecksum: pkg.manifest.pdfChecksum } });
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `attachment; filename="${pkg.filename}"`);
+        res.send(Buffer.from(pkg.pdfBytes));
+      }
+    } catch (err: any) {
+      const code = err?.code === "FORBIDDEN" ? 403 : err?.code === "NOT_FOUND" ? 404 : 500;
+      res.status(code).json({ ok: false, error: err?.message ?? "Unknown error" });
+    }
+  });
+
   // ─── Daily Digest endpoint ────────────────────────────────────────────────
   // Called daily by Manus Heartbeat (project-level cron, §4a).
   // Generates an LLM-summarised email of the previous day's activity and sends
