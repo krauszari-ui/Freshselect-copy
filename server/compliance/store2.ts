@@ -288,6 +288,20 @@ export async function createFinding(actor: Actor, data: { auditId: number; submi
     await recordAuditEvent(tx, { ...actor, action: "finding_created", recordType: "auditFinding", recordId: id, clientId: data.submissionId ?? null, newValue: { risk: data.risk, repeatFinding: data.repeatFinding } });
     const [row] = await tx.select().from(auditFindings).where(eq(auditFindings.id, id));
     return row;
+  }).then(async (row) => {
+    // Escalate high/critical findings to oversight (best-effort, advisory).
+    if (row.risk === "high" || row.risk === "critical") {
+      try {
+        const { notifyOversight } = await import("./notificationService");
+        await notifyOversight({
+          category: "finding", severity: row.risk === "critical" ? "critical" : "warning",
+          title: `New ${row.risk} audit finding`,
+          body: (row.conditionFound ?? `Finding #${row.id}`).slice(0, 500),
+          relatedRecordType: "auditFinding", relatedRecordId: row.id,
+        }, actor.actorId ?? undefined);
+      } catch { /* advisory */ }
+    }
+    return row;
   });
 }
 

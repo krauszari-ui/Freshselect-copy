@@ -3,7 +3,7 @@ import { getLoginUrl } from "@/const";
 import { useLocation, Link } from "wouter";
 import {
   LayoutDashboard, Users, ClipboardList, FileText, Building2,
-  LogOut, Loader2, ShieldCheck, ChevronRight, Leaf, Link2, UserCog, AlertTriangle, BarChart3, Bell, ScrollText, Menu, X, Mail, MessageSquare,
+  LogOut, Loader2, ShieldCheck, ShieldAlert, ChevronRight, Leaf, Link2, UserCog, AlertTriangle, BarChart3, Bell, ScrollText, Menu, X, Mail, MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { type ReactNode, useState, useEffect } from "react";
@@ -257,6 +257,13 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const { data: complianceFlags } = trpc.compliance.flags.useQuery(undefined, { staleTime: 60_000 });
   const complianceEnabled = complianceFlags?.module === true;
 
+  // Break-glass banner: when the caller holds active emergency access, show a
+  // persistent, unmissable banner. Only queried when the module is enabled.
+  const { data: breakGlassGrants } = trpc.compliance.breakGlass.active.useQuery(undefined, {
+    enabled: complianceEnabled, staleTime: 30_000, refetchInterval: 60_000, retry: false,
+  });
+  const activeBreakGlass = breakGlassGrants ?? [];
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-green-900">
@@ -377,6 +384,17 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             </Link>
           )}
         </div>
+
+        {activeBreakGlass.length > 0 && (
+          <Link href="/admin/compliance/settings">
+            <div role="alert" className="sticky top-0 z-20 flex items-center gap-2 bg-amber-500 text-amber-950 px-4 py-2 text-sm font-medium cursor-pointer hover:bg-amber-400">
+              <ShieldAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span>
+                Break-glass emergency access is ACTIVE ({activeBreakGlass[0].scope}). This session is being audited and reviewed — click to manage or revoke.
+              </span>
+            </div>
+          </Link>
+        )}
 
         {children}
         <InactivityGuard />

@@ -1802,3 +1802,26 @@ export const userSessions = mysqlTable("userSessions", {
   idx_userSessions_expiresAt: index("idx_userSessions_expiresAt").on(t.expiresAt),
 }));
 export type UserSession = typeof userSessions.$inferSelect;
+
+// ─── Compliance notifications / escalation ───────────────────────────────────
+/**
+ * In-app notifications for compliance events (break-glass activation, new
+ * findings, escalations). Addressed to a specific recipient user. Purely
+ * additive; surfaced in the compliance UI and never blocks any workflow.
+ */
+export const complianceNotifications = mysqlTable("complianceNotifications", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id),
+  category: varchar("category", { length: 64 }).notNull(),
+  severity: varchar("severity", { length: 16 }).notNull().default("info"), // info | warning | critical
+  title: varchar("title", { length: 256 }).notNull(),
+  body: text("body"),
+  relatedRecordType: varchar("relatedRecordType", { length: 64 }),
+  relatedRecordId: varchar("relatedRecordId", { length: 64 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  readAt: timestamp("readAt"),
+}, (t) => ({
+  idx_complianceNotifications_userId: index("idx_complianceNotifications_userId").on(t.userId),
+  idx_complianceNotifications_readAt: index("idx_complianceNotifications_readAt").on(t.readAt),
+}));
+export type ComplianceNotification = typeof complianceNotifications.$inferSelect;

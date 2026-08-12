@@ -369,6 +369,59 @@ async function main() {
   try { await adminReauthCaller.compliance.sessions.reauth({ password: "wrong-password" }); } catch { badReauthRejected = true; }
   ok(badReauthRejected, "reauth with a wrong password is rejected");
 
+  console.log("\n══ Phase 12g: break-glass access + notifications ══");
+  // The worker activates emergency access; oversight (admins) get notified and
+  // the actor gets an advisory notice. Everything is on the audit chain.
+  const bgGrant = await workerCaller.compliance.breakGlass.activate({
+    reason: "Urgent access needed to resolve a same-day billing discrepancy (e2e).",
+    scope: `Client #${submissionId} billing`,
+    ttlMinutes: 30,
+  });
+  ok(bgGrant.isBreakGlass && new Date(bgGrant.expiresAt).getTime() > Date.now(), "break-glass grant is active with a future expiry");
+  const bgActive = await workerCaller.compliance.breakGlass.active();
+  ok(bgActive.some((g) => g.id === bgGrant.id), "the actor sees their active break-glass grant (banner source)");
+
+  // Oversight notification landed for the admin, tied to this grant.
+  const adminNotes = await caller.compliance.notifications.list();
+  ok(adminNotes.some((n) => n.category === "break_glass" && n.relatedRecordId === String(bgGrant.id)), "oversight (admin) was notified of the break-glass activation");
+  const workerNotes = await workerCaller.compliance.notifications.list();
+  ok(workerNotes.some((n) => n.category === "break_glass"), "the actor received an advisory break-glass notice");
+
+  // Oversight can list all break-glass grants for after-the-fact review.
+  const bgList = await caller.compliance.breakGlass.list();
+  ok(bgList.some((g) => g.id === bgGrant.id), "oversight list includes the grant for review");
+  // A non-oversight user cannot list all grants.
+  let bgListForbidden = false;
+  try { await workerCaller.compliance.breakGlass.list(); } catch { bgListForbidden = true; }
+  ok(bgListForbidden, "a non-oversight user cannot list all break-glass grants");
+
+  // Mark-read narrows the unread count.
+  const beforeRead = await caller.compliance.notifications.unreadCount();
+  const target = adminNotes.find((n) => n.category === "break_glass" && !n.readAt);
+  if (target) await caller.compliance.notifications.markRead({ id: target.id });
+  const afterRead = await caller.compliance.notifications.unreadCount();
+  ok(afterRead < beforeRead, "marking a notification read decreases the unread count");
+
+  // Cross-user IDOR: worker cannot mark the admin's notification read.
+  let noteIdorBlocked = false;
+  if (target) {
+    const res = await workerCaller.compliance.notifications.markRead({ id: target.id });
+    noteIdorBlocked = res.ok === false;
+  }
+  ok(noteIdorBlocked || !target, "a user cannot mark another user's notification read (IDOR-guarded)");
+
+  // Revoke break-glass early; the actor's active set empties.
+  const bgRevoke = await workerCaller.compliance.breakGlass.revoke({ grantId: bgGrant.id });
+  ok(bgRevoke.revoked, "break-glass access can be revoked early");
+  const bgAfter = await workerCaller.compliance.breakGlass.active();
+  ok(!bgAfter.some((g) => g.id === bgGrant.id), "the revoked grant is no longer active");
+
+  // High-risk finding escalation: the approver files a critical finding; the
+  // admin (oversight, not the author) is notified.
+  const critFinding = await approverCaller.compliance.audits.createFinding({ auditId: audit.id, conditionFound: "Critical control gap (e2e)", risk: "critical" });
+  const adminNotes2 = await caller.compliance.notifications.list();
+  ok(adminNotes2.some((n) => n.category === "finding" && n.relatedRecordId === String(critFinding.id)), "a critical finding escalates a notification to oversight");
+
   console.log("\n══ Phase 13: audit-chain integrity ══");
   const chain = await loadAuditChain(db);
   const verify = verifyAuditChain(chain);

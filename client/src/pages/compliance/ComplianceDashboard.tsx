@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
-import { ShieldCheck, ShieldAlert, BookOpen, BookMarked, BarChart3, Users, Loader2, CheckCircle2, XCircle, Info, Search, KeyRound, Monitor } from "lucide-react";
+import { ShieldCheck, ShieldAlert, BookOpen, BookMarked, BarChart3, Users, Loader2, CheckCircle2, XCircle, Info, Search, KeyRound, Monitor, Settings } from "lucide-react";
 
 /**
  * Executive compliance dashboard. Cards deep-link to the underlying records.
@@ -177,6 +177,21 @@ export default function ComplianceDashboard() {
               <CardContent className="text-sm text-slate-600">
                 See where you are signed in and revoke a device. Sessions carry idle and absolute
                 timeouts and end automatically on a password or MFA change.
+              </CardContent>
+            </Card>
+          </Link>
+
+          {/* Security settings: break-glass + notifications */}
+          <Link href="/admin/compliance/settings">
+            <Card className="hover:border-green-500 transition-colors cursor-pointer h-full">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Settings className="h-4 w-4 text-green-700" aria-hidden="true" /> Security settings
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-slate-600">
+                Break-glass emergency access (audited and time-boxed) and your compliance
+                notifications and escalations.
               </CardContent>
             </Card>
           </Link>
