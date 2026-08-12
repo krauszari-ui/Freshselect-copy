@@ -18,6 +18,7 @@ import { loadAuditChain, verifyAuditChain, getEventsForRecord } from "./audit";
 import { permProcedure, actorFromCtx, assertClientAccess, submissionIdInput } from "./procedures";
 import { encountersRouter, billingRouter, auditsRouter, nutritionRouter, overpaymentsRouter } from "./routerOps";
 import { guidanceRouter } from "./routerGuidance";
+import { reportsRouter } from "./routerReports";
 
 export const complianceRouter = router({
   /** Public: flag snapshot so the UI matches the server. */
@@ -30,6 +31,7 @@ export const complianceRouter = router({
   nutrition: nutritionRouter,
   overpayments: overpaymentsRouter,
   guidance: guidanceRouter,
+  reports: reportsRouter,
 
   readiness: router({
     get: permProcedure(PERMISSIONS.READINESS_VIEW).input(submissionIdInput).query(async ({ input, ctx }) => {

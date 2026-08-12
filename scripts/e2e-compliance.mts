@@ -240,6 +240,22 @@ async function main() {
   const ack2 = await workerCaller.compliance.guidance.decisions.acknowledgeTraining({ internalDecisionId: decisionId });
   ok(ack1.acknowledged && !ack2.acknowledged, "training acknowledgment is idempotent (once per user)");
 
+  console.log("\n══ Phase 12c: reports + audited CSV export ══");
+  const catalog = await caller.compliance.reports.list();
+  ok(catalog.length >= 15, `report catalog lists ${catalog.length} reports the caller may run`);
+  const readinessReport = await caller.compliance.reports.run({ key: "client_readiness" });
+  ok(readinessReport.rows.length >= 1, "client_readiness report returns at least this run's client");
+  ok(readinessReport.rows.some((r) => r.status === "ready_for_service"), "report shows the ready client");
+  const utilReport = await caller.compliance.reports.run({ key: "authorization_utilization" });
+  ok(utilReport.rows.some((r) => Number(r.consumedUnits) === 2), "utilization report reflects 2 consumed units");
+  // A worker lacks EXPORT → export must be forbidden, but running is allowed for permitted reports.
+  let exportForbidden = false;
+  try { await workerCaller.compliance.reports.exportCsv({ key: "client_readiness" }); } catch { exportForbidden = true; }
+  ok(exportForbidden, "worker without EXPORT cannot export (server-enforced)");
+  const exported = await caller.compliance.reports.exportCsv({ key: "client_readiness" });
+  ok(exported.csv.startsWith("clientId,client,status,computedAt"), "CSV export has the expected header");
+  ok(exported.filename.endsWith(".csv") && exported.rows >= 1, "CSV export names a file and reports row count");
+
   console.log("\n══ Phase 13: audit-chain integrity ══");
   const chain = await loadAuditChain(db);
   const verify = verifyAuditChain(chain);

@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
-import { ShieldCheck, ShieldAlert, BookOpen, BookMarked, Users, Loader2, CheckCircle2, XCircle, Info, Search } from "lucide-react";
+import { ShieldCheck, ShieldAlert, BookOpen, BookMarked, BarChart3, Users, Loader2, CheckCircle2, XCircle, Info, Search } from "lucide-react";
 
 /**
  * Executive compliance dashboard. Cards deep-link to the underlying records.
@@ -117,6 +117,21 @@ export default function ComplianceDashboard() {
               <CardContent className="text-sm text-slate-600">
                 Source guidance and the clarification workflow for unclear requirements; privileged
                 legal records are access-restricted.
+              </CardContent>
+            </Card>
+          </Link>
+
+          {/* Reports */}
+          <Link href="/admin/compliance/reports">
+            <Card className="hover:border-green-500 transition-colors cursor-pointer h-full">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-green-700" aria-hidden="true" /> Reports
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-slate-600">
+                Readiness, expiring eligibility/authorizations, billing, findings, exposure and
+                more — with permission-controlled CSV export.
               </CardContent>
             </Card>
           </Link>
