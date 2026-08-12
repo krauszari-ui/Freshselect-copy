@@ -15,7 +15,8 @@ import { complianceFlagSnapshot } from "./flags";
 import * as store from "./store";
 import { consumeUnits } from "./authorizations";
 import { loadAuditChain, verifyAuditChain, getEventsForRecord } from "./audit";
-import { permProcedure, actorFromCtx, assertClientAccess, submissionIdInput } from "./procedures";
+import { permProcedure, actorFromCtx, assertClientAccess, submissionIdInput, callerHasPermission } from "./procedures";
+import { getClientFolder } from "./folder";
 import { encountersRouter, billingRouter, auditsRouter, nutritionRouter, overpaymentsRouter } from "./routerOps";
 import { guidanceRouter } from "./routerGuidance";
 import { reportsRouter } from "./routerReports";
@@ -43,6 +44,15 @@ export const complianceRouter = router({
   notifications: notificationsRouter,
   jobs: jobsRouter,
   normalization: normalizationRouter,
+
+  /** Per-client audit folder — all documents unified from every source. */
+  folder: router({
+    list: permProcedure(PERMISSIONS.DOCUMENT_VIEW).input(submissionIdInput).query(async ({ input, ctx }) => {
+      await assertClientAccess(ctx.user, input.submissionId);
+      const includePrivileged = await callerHasPermission(ctx.user, PERMISSIONS.PRIVILEGED_VIEW);
+      return getClientFolder(input.submissionId, { includePrivileged });
+    }),
+  }),
 
   readiness: router({
     get: permProcedure(PERMISSIONS.READINESS_VIEW).input(submissionIdInput).query(async ({ input, ctx }) => {

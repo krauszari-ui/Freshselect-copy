@@ -20,6 +20,7 @@ import { appRouter } from "../server/routers";
 import { getDb, getUserByEmail, createStaffUser } from "../server/db";
 import {
   submissions, serviceAuthorizations, complianceReadiness, auditFindings,
+  documents, complianceDocuments,
 } from "../drizzle/schema";
 import { loadAuditChain, verifyAuditChain } from "../server/compliance/audit";
 import { totp } from "../server/compliance/infra/mfa";
@@ -486,6 +487,40 @@ async function main() {
   let backfillForbidden = false;
   try { await workerCaller.compliance.normalization.backfill(); } catch { backfillForbidden = true; }
   ok(backfillForbidden, "a viewer cannot run the backfill (COMPLIANCE_MANAGE required)");
+
+  console.log("\n══ Phase 12j: client audit folder (unified documents) ══");
+  // Seed one document from each real source for this client.
+  await db.insert(documents).values({
+    submissionId, name: "Consent form.pdf", category: "consent",
+    url: "https://example.com/consent.pdf", fileKey: `documents/consent-${run}.pdf`, mimeType: "application/pdf",
+  });
+  // An intake-embedded file inside the submission's formData.
+  await db.update(submissions).set({
+    formData: { source: "e2e", uploadedDocuments: { medicaidCard: { url: "https://example.com/mc.jpg", key: `documents/mc-${run}.jpg` } } },
+  }).where(eq(submissions.id, submissionId));
+  // Compliance evidence: a standard doc, a quarantined doc (excluded), a privileged doc.
+  await db.insert(complianceDocuments).values({ submissionId, objectKey: `compliance/std-${run}.pdf`, originalFilename: "Eligibility proof.pdf", scanStatus: "passed", confidentiality: "standard", recordStatus: "active" });
+  await db.insert(complianceDocuments).values({ submissionId, objectKey: `compliance/quar-${run}.pdf`, originalFilename: "Unscanned.pdf", scanStatus: "quarantined", confidentiality: "standard", recordStatus: "active" });
+  await db.insert(complianceDocuments).values({ submissionId, objectKey: `compliance/priv-${run}.pdf`, originalFilename: "Attorney memo.pdf", scanStatus: "passed", confidentiality: "attorney_client_privileged", recordStatus: "active" });
+
+  const folder = await caller.compliance.folder.list({ submissionId });
+  const names = folder.documents.map((d) => d.name);
+  ok(folder.counts.total >= 4, `folder gathered ${folder.counts.total} documents from all sources`);
+  ok(names.includes("Consent form.pdf"), "folder includes the legacy admin document");
+  ok(folder.documents.some((d) => d.source === "application"), "folder includes the intake formData file");
+  ok(names.includes("Eligibility proof.pdf"), "folder includes the standard compliance evidence");
+  ok(names.includes("Attorney memo.pdf"), "admin (PRIVILEGED_VIEW) sees the privileged document");
+  ok(!names.includes("Unscanned.pdf"), "a quarantined document is excluded from the folder");
+
+  // A worker lacks PRIVILEGED_VIEW → the privileged doc is filtered server-side.
+  const workerFolder = await workerCaller.compliance.folder.list({ submissionId });
+  const workerNames = workerFolder.documents.map((d) => d.name);
+  ok(workerNames.includes("Eligibility proof.pdf"), "worker sees standard documents");
+  ok(!workerNames.includes("Attorney memo.pdf"), "worker (no PRIVILEGED_VIEW) cannot see the privileged document");
+
+  // Documents are scoped to the client — another client's folder does not leak them.
+  const otherFolder = await caller.compliance.folder.list({ submissionId: otherSub[0].id });
+  ok(!otherFolder.documents.some((d) => d.name === "Consent form.pdf"), "documents are scoped to their own client (no cross-client leak)");
 
   console.log("\n══ Phase 13: audit-chain integrity ══");
   const chain = await loadAuditChain(db);

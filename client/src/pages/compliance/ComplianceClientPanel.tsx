@@ -9,9 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ReadinessBadge } from "./readinessBadge";
 import { maskIdentifier } from "@shared/compliance/constants";
-import { ArrowLeft, Loader2, RefreshCw, Plus, ShieldAlert } from "lucide-react";
+import { ArrowLeft, Loader2, RefreshCw, Plus, ShieldAlert, FolderOpen, FileText, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useOpenDocument } from "@/hooks/useOpenDocument";
 
 /**
  * Per-client compliance record: a readiness banner (derived, not hand-set) plus
@@ -73,6 +74,7 @@ export default function ComplianceClientPanel() {
             <TabsTrigger value="requirements">Requirements</TabsTrigger>
             <TabsTrigger value="deliveries">Deliveries</TabsTrigger>
             <TabsTrigger value="billing">Billing</TabsTrigger>
+            <TabsTrigger value="folder">Audit Folder</TabsTrigger>
           </TabsList>
 
           <TabsContent value="eligibility"><EligibilityTab submissionId={submissionId} /></TabsContent>
@@ -82,6 +84,7 @@ export default function ComplianceClientPanel() {
           <TabsContent value="requirements"><RequirementsTab submissionId={submissionId} /></TabsContent>
           <TabsContent value="deliveries"><DeliveriesTab submissionId={submissionId} /></TabsContent>
           <TabsContent value="billing"><BillingTab submissionId={submissionId} /></TabsContent>
+          <TabsContent value="folder"><AuditFolderTab submissionId={submissionId} /></TabsContent>
         </Tabs>
       </div>
     </AdminLayout>
@@ -381,6 +384,71 @@ function BillingTab({ submissionId }: { submissionId: number }) {
           ))}
         </ul>
       </QueryStates>
+    </SectionShell>
+  );
+}
+
+const FOLDER_SOURCE_LABELS: Record<string, string> = {
+  admin_upload: "Admin uploads",
+  application: "Submitted with application",
+  compliance: "Compliance evidence",
+};
+
+/**
+ * Audit Folder — every document this client has, unified from the admin
+ * documents table, files submitted with the intake application, and the
+ * compliance evidence store. Each file opens through a fresh signed URL.
+ */
+function AuditFolderTab({ submissionId }: { submissionId: number }) {
+  const folder = trpc.compliance.folder.list.useQuery({ submissionId });
+  const { openDocument, loading } = useOpenDocument();
+
+  if (folder.isLoading) return <div className="mt-4 flex items-center gap-2 text-slate-500 text-sm"><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Loading…</div>;
+  if (folder.isError) return <SectionShell title="Audit folder"><p className="text-sm text-slate-500">Unable to load (database unavailable).</p></SectionShell>;
+
+  const docs = folder.data?.documents ?? [];
+  const counts = folder.data?.counts;
+  // Group by source, preserving a stable section order.
+  const bySource: Record<string, typeof docs> = { admin_upload: [], application: [], compliance: [] };
+  for (const d of docs) (bySource[d.source] ??= []).push(d);
+
+  return (
+    <SectionShell
+      title={`Audit folder${counts ? ` — ${counts.total} document${counts.total === 1 ? "" : "s"}` : ""}`}
+      action={<span className="flex items-center gap-1 text-xs text-slate-500"><FolderOpen className="h-4 w-4 text-green-700" aria-hidden="true" /> All documents for this client</span>}
+    >
+      {docs.length === 0 ? (
+        <p className="text-sm text-slate-500">No documents on file for this client yet.</p>
+      ) : (
+        <div className="space-y-4">
+          {(["admin_upload", "application", "compliance"] as const).map((src) =>
+            bySource[src].length === 0 ? null : (
+              <div key={src}>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">{FOLDER_SOURCE_LABELS[src]} ({bySource[src].length})</p>
+                <ul className="space-y-1.5">
+                  {bySource[src].map((d) => {
+                    const handle = d.fileKey ?? d.url;
+                    const isOpening = !!handle && loading === handle;
+                    return (
+                      <li key={d.id} className="flex items-center justify-between gap-2 rounded-md border bg-slate-50 px-3 py-2">
+                        <span className="flex min-w-0 items-center gap-2">
+                          <FileText className="h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+                          <span className="truncate text-sm text-slate-700">{d.name}</span>
+                          {d.category && <Badge variant="outline" className="shrink-0">{d.category.replace(/_/g, " ")}</Badge>}
+                          {d.confidentiality && d.confidentiality !== "standard" && <Badge variant="secondary" className="shrink-0">{d.confidentiality.replace(/_/g, " ")}</Badge>}
+                        </span>
+                        <Button size="sm" variant="ghost" className="shrink-0 gap-1" disabled={!handle || isOpening} onClick={() => openDocument(handle, submissionId)}>
+                          {isOpening ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <ExternalLink className="h-4 w-4" aria-hidden="true" />} Open
+                        </Button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ),
+          )}
+        </div>
+      )}
     </SectionShell>
   );
 }
