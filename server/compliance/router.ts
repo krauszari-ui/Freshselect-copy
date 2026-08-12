@@ -17,6 +17,7 @@ import { consumeUnits } from "./authorizations";
 import { loadAuditChain, verifyAuditChain, getEventsForRecord } from "./audit";
 import { permProcedure, actorFromCtx, assertClientAccess, submissionIdInput, callerHasPermission } from "./procedures";
 import { getClientFolder } from "./folder";
+import { listWeeklyPodForClient } from "./pod";
 import { encountersRouter, billingRouter, auditsRouter, nutritionRouter, overpaymentsRouter } from "./routerOps";
 import { guidanceRouter } from "./routerGuidance";
 import { reportsRouter } from "./routerReports";
@@ -53,6 +54,11 @@ export const complianceRouter = router({
       await assertClientAccess(ctx.user, input.submissionId);
       const includePrivileged = await callerHasPermission(ctx.user, PERMISSIONS.PRIVILEGED_VIEW);
       return getClientFolder(input.submissionId, { includePrivileged });
+    }),
+    /** Weekly proof-of-delivery for this client (missing weeks flagged). */
+    weeklyPod: permProcedure(PERMISSIONS.DOCUMENT_VIEW).input(submissionIdInput).query(async ({ input, ctx }) => {
+      await assertClientAccess(ctx.user, input.submissionId);
+      return listWeeklyPodForClient(input.submissionId);
     }),
   }),
 

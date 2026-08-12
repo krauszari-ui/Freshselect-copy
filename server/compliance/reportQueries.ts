@@ -122,6 +122,16 @@ export async function runReport(key: string): Promise<ReportResult> {
       const rows = await listReconciliationMismatches();
       return result(["clientId", "mismatchedFields", "reconciledAt"], rows.map((r) => ({ clientId: r.submissionId, mismatchedFields: r.mismatchFlags.join("; "), reconciledAt: r.reconciledAt })));
     },
+    weekly_pod: async () => {
+      const { allWeeklyPods } = await import("./pod");
+      const rows = await allWeeklyPods();
+      return result(["clientId", "client", "weekOf", "vendor", "status", "podUrl"], rows.map((r) => ({ clientId: r.submissionId, client: r.client, weekOf: r.weekOf, vendor: r.vendor, status: r.status, podUrl: r.podUrl })));
+    },
+    missing_pod: async () => {
+      const { missingPodRows } = await import("./pod");
+      const rows = await missingPodRows();
+      return result(["clientId", "client", "weekOf", "vendor"], rows.map((r) => ({ clientId: r.submissionId, client: r.client, weekOf: r.weekOf, vendor: r.vendor })));
+    },
   };
   const runner = runners[key];
   if (!runner) throw new Error(`UNKNOWN_REPORT:${key}`);

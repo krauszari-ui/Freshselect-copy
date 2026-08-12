@@ -585,6 +585,24 @@ async function main() {
   ok(notDeliverable, "a vendor cannot submit proof for a client on another vendor's list");
   delete process.env.COMPLIANCE_VENDOR_PORTAL;
 
+  console.log("\n══ Phase 12l: weekly PoD in the folder + reports ══");
+  const weekOfStr = weekOf.toISOString().slice(0, 10);
+  // activeA has proof for the current week; earlier weeks should flag missing.
+  const weeklyA = await caller.compliance.folder.weeklyPod({ submissionId: activeA });
+  const thisWeekA = weeklyA.find((w) => w.weekOf === weekOfStr);
+  ok(!!thisWeekA && !thisWeekA.missing && !!thisWeekA.podUrl, "current week shows the vendor's proof (not missing)");
+  ok(weeklyA.some((w) => w.missing), "an earlier week with no proof is flagged missing for an active client");
+  // Inactive client: weeks are shown but never flagged missing (no delivery obligation).
+  const weeklyC = await caller.compliance.folder.weeklyPod({ submissionId: inactiveC });
+  ok(weeklyC.every((w) => !w.missing), "a non-active client is never flagged as missing proof");
+
+  // Reports.
+  const podReport = await caller.compliance.reports.run({ key: "weekly_pod" });
+  ok(podReport.rows.some((r) => r.clientId === activeA), "the weekly_pod report logs the submitted proof");
+  const missingReport = await caller.compliance.reports.run({ key: "missing_pod" });
+  ok(missingReport.rows.some((r) => r.clientId === activeB), "the missing_pod report lists an active client with no recent proof");
+  ok(!missingReport.rows.some((r) => r.clientId === inactiveC), "the missing_pod report excludes non-active clients");
+
   console.log("\n══ Phase 13: audit-chain integrity ══");
   const chain = await loadAuditChain(db);
   const verify = verifyAuditChain(chain);

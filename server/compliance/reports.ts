@@ -59,6 +59,8 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
   { key: "manual_overrides", title: "Manual Overrides", description: "Approved requirement exceptions (gate overrides).", permission: "exception:approve" },
   { key: "document_downloads", title: "Document Downloads", description: "Restricted document access/reveal log.", permission: "audit:view" },
   { key: "formdata_reconciliation", title: "formData Reconciliation", description: "Submissions whose structured columns disagree with the formData payload.", permission: "compliance:view" },
+  { key: "weekly_pod", title: "Weekly Proof of Delivery", description: "Vendor-submitted proof-of-delivery records by client and week.", permission: "service:view" },
+  { key: "missing_pod", title: "Missing Proof of Delivery", description: "Active clients with no proof of delivery in recent weeks.", permission: "service:view" },
 ];
 
 export const REPORT_KEYS = REPORT_DEFINITIONS.map((r) => r.key);

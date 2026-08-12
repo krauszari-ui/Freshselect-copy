@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ReadinessBadge } from "./readinessBadge";
 import { maskIdentifier } from "@shared/compliance/constants";
-import { ArrowLeft, Loader2, RefreshCw, Plus, ShieldAlert, FolderOpen, FileText, ExternalLink } from "lucide-react";
+import { ArrowLeft, Loader2, RefreshCw, Plus, ShieldAlert, FolderOpen, FileText, ExternalLink, Truck, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useOpenDocument } from "@/hooks/useOpenDocument";
@@ -413,6 +413,7 @@ function AuditFolderTab({ submissionId }: { submissionId: number }) {
   for (const d of docs) (bySource[d.source] ??= []).push(d);
 
   return (
+    <>
     <SectionShell
       title={`Audit folder${counts ? ` — ${counts.total} document${counts.total === 1 ? "" : "s"}` : ""}`}
       action={<span className="flex items-center gap-1 text-xs text-slate-500"><FolderOpen className="h-4 w-4 text-green-700" aria-hidden="true" /> All documents for this client</span>}
@@ -448,6 +449,52 @@ function AuditFolderTab({ submissionId }: { submissionId: number }) {
             ),
           )}
         </div>
+      )}
+    </SectionShell>
+    <WeeklyPodSection submissionId={submissionId} />
+    </>
+  );
+}
+
+/**
+ * Weekly proof of meal deliveries for this client — vendor-submitted PoD links
+ * grouped by week, with weeks that are missing proof flagged for follow-up.
+ */
+function WeeklyPodSection({ submissionId }: { submissionId: number }) {
+  const weekly = trpc.compliance.folder.weeklyPod.useQuery({ submissionId });
+  const rows = weekly.data ?? [];
+  const missing = rows.filter((r) => r.missing).length;
+
+  return (
+    <SectionShell
+      title="Weekly proof of delivery"
+      action={<span className="flex items-center gap-1 text-xs text-slate-500"><Truck className="h-4 w-4 text-green-700" aria-hidden="true" /> {missing > 0 ? `${missing} week(s) missing proof` : "Vendor-submitted per week"}</span>}
+    >
+      {weekly.isLoading && <div className="flex items-center gap-2 text-slate-500 text-sm"><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Loading…</div>}
+      {weekly.isError && <p className="text-sm text-slate-500">Unable to load delivery proof.</p>}
+      {weekly.data && rows.length === 0 && <p className="text-sm text-slate-500">No delivery weeks to show yet.</p>}
+      {rows.length > 0 && (
+        <ul className="divide-y text-sm">
+          {rows.map((r) => (
+            <li key={r.weekOf} className={`py-2 flex items-center justify-between gap-2 ${r.missing ? "bg-amber-50 -mx-2 px-2 rounded" : ""}`}>
+              <span className="flex items-center gap-2">
+                <span className="font-medium text-slate-700">Week of {r.weekOf}</span>
+                <span className="text-xs text-slate-400">{r.weekLabel}</span>
+                {r.vendorName && <Badge variant="outline">{r.vendorName}</Badge>}
+                {r.podMethod && <Badge variant="secondary">{r.podMethod.replace(/_/g, " ")}</Badge>}
+              </span>
+              <span className="flex items-center gap-2">
+                {r.missing ? (
+                  <span className="flex items-center gap-1 text-xs font-medium text-amber-700"><AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" /> Missing proof</span>
+                ) : r.podUrl ? (
+                  <a href={r.podUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-blue-600 hover:underline"><CheckCircle2 className="h-3.5 w-3.5 text-green-700" aria-hidden="true" /> View proof</a>
+                ) : (
+                  <span className="flex items-center gap-1 text-xs text-slate-500"><CheckCircle2 className="h-3.5 w-3.5 text-green-700" aria-hidden="true" /> On file</span>
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
       )}
     </SectionShell>
   );
