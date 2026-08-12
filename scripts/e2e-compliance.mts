@@ -28,6 +28,8 @@ import {
   SESSION_IDLE_TIMEOUT_MS, SESSION_ABSOLUTE_TIMEOUT_MS,
 } from "../server/compliance/sessionService";
 import { randomUUID } from "node:crypto";
+import { enqueueJob } from "../server/compliance/infra/jobQueue";
+import { drainQueue } from "../server/compliance/worker";
 import type { User } from "../drizzle/schema";
 
 // ─── Tiny assert harness ─────────────────────────────────────────────────────
@@ -421,6 +423,31 @@ async function main() {
   const critFinding = await approverCaller.compliance.audits.createFinding({ auditId: audit.id, conditionFound: "Critical control gap (e2e)", risk: "critical" });
   const adminNotes2 = await caller.compliance.notifications.list();
   ok(adminNotes2.some((n) => n.category === "finding" && n.relatedRecordId === String(critFinding.id)), "a critical finding escalates a notification to oversight");
+
+  console.log("\n══ Phase 12h: durable job queue + worker ══");
+  // Clear any backlog from earlier runs so this run's assertions are exact.
+  await drainQueue(500);
+  // Enqueue real jobs and drain them through the worker's handler registry.
+  const idemKey = `readiness-${submissionId}-${run}`;
+  const enq1 = await enqueueJob({ jobType: "readiness_recalc", payload: { submissionId }, idempotencyKey: idemKey });
+  ok(enq1.enqueued, "a readiness_recalc job is enqueued");
+  const enq2 = await enqueueJob({ jobType: "readiness_recalc", payload: { submissionId }, idempotencyKey: idemKey });
+  ok(!enq2.enqueued, "a duplicate enqueue with the same idempotency key is ignored");
+  // Also enqueue an audit-integrity verification job (chain is intact → succeeds).
+  await enqueueJob({ jobType: "audit_integrity_verification", idempotencyKey: `integrity-${run}` });
+
+  const drained = await drainQueue(50);
+  ok(drained.processed >= 2 && drained.failed === 0, `worker drained ${drained.processed} job(s) with no failures`);
+  ok(drained.succeeded >= 2, "the readiness + integrity jobs both succeeded");
+
+  // Oversight can read queue stats and drive a drain; a worker cannot.
+  const stats = await caller.compliance.jobs.stats();
+  ok(typeof stats === "object" && (stats.succeeded ?? 0) >= 2, "job stats report succeeded jobs");
+  const manualDrain = await caller.compliance.jobs.drain({ max: 10 });
+  ok(manualDrain.processed === 0, "a second drain finds the queue already empty");
+  let jobsForbidden = false;
+  try { await workerCaller.compliance.jobs.stats(); } catch { jobsForbidden = true; }
+  ok(jobsForbidden, "a non-oversight user cannot read the job queue stats");
 
   console.log("\n══ Phase 13: audit-chain integrity ══");
   const chain = await loadAuditChain(db);

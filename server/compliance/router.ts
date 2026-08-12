@@ -22,6 +22,7 @@ import { reportsRouter } from "./routerReports";
 import { mfaRouter } from "./routerMfa";
 import { sessionsRouter } from "./routerSessions";
 import { breakGlassRouter, notificationsRouter } from "./routerSecurity";
+import { jobsRouter } from "./routerJobs";
 
 export const complianceRouter = router({
   /** Public: flag snapshot so the UI matches the server. */
@@ -39,6 +40,7 @@ export const complianceRouter = router({
   sessions: sessionsRouter,
   breakGlass: breakGlassRouter,
   notifications: notificationsRouter,
+  jobs: jobsRouter,
 
   readiness: router({
     get: permProcedure(PERMISSIONS.READINESS_VIEW).input(submissionIdInput).query(async ({ input, ctx }) => {

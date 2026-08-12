@@ -411,6 +411,41 @@ async function startServer() {
     }
   });
 
+  // ─── Compliance job-queue drain endpoint ──────────────────────────────────
+  // Serverless-friendly way to run the durable job worker: a scheduled caller
+  // (cron) hits this to process a batch of queued jobs. Requires the CRON_SECRET
+  // header (or an authenticated cron principal). No-op unless the module is on.
+  app.post("/api/scheduled/process-jobs", async (req, res) => {
+    try {
+      const cronSecret = process.env.CRON_SECRET;
+      const headerSecret = req.headers["x-cron-secret"] as string | undefined;
+      const hasSecretBypass = cronSecret && headerSecret && headerSecret === cronSecret;
+      if (!hasSecretBypass) {
+        const user = await sdk.authenticateRequest(req).catch(() => null);
+        if (!user || !(user as any).isCron) {
+          res.status(401).json({ ok: false, error: "cron-only" });
+          return;
+        }
+      }
+    } catch {
+      res.status(401).json({ ok: false, error: "Unauthorized" });
+      return;
+    }
+    try {
+      const { isComplianceModuleEnabled } = await import("../compliance/flags");
+      if (!isComplianceModuleEnabled()) {
+        res.json({ ok: true, skipped: "module_disabled" });
+        return;
+      }
+      const { drainQueue } = await import("../compliance/worker");
+      const batch = Math.min(Math.max(Number(req.query.max ?? 25), 1), 200);
+      const result = await drainQueue(batch);
+      res.json({ ok: true, ...result });
+    } catch (err: any) {
+      res.status(500).json({ ok: false, error: err?.message ?? "Unknown error" });
+    }
+  });
+
   // ─── Daily Digest endpoint ────────────────────────────────────────────────
   // Called daily by Manus Heartbeat (project-level cron, §4a).
   // Generates an LLM-summarised email of the previous day's activity and sends
@@ -568,6 +603,15 @@ async function startServer() {
 
   if (port !== preferredPort) {
     console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
+  }
+
+  // Wire optional compliance infra (Redis rate store, durable job worker).
+  // Fail-safe and default-off; never blocks server start.
+  try {
+    const { initComplianceInfra } = await import("../compliance/boot");
+    await initComplianceInfra();
+  } catch (err) {
+    console.warn("[Compliance] infra init skipped:", String(err));
   }
 
   server.listen(port, () => {
