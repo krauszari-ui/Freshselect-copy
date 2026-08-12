@@ -449,6 +449,44 @@ async function main() {
   try { await workerCaller.compliance.jobs.stats(); } catch { jobsForbidden = true; }
   ok(jobsForbidden, "a non-oversight user cannot read the job queue stats");
 
+  console.log("\n══ Phase 12i: formData normalization + reconciliation ══");
+  // A submission whose structured lastName DISAGREES with its formData payload.
+  const mmSub = await db.insert(submissions).values({
+    referenceNumber: `E2EMM-${run}`.slice(0, 16),
+    firstName: "Norm", lastName: "ColumnName",
+    email: `norm+${run}@example.com`, cellPhone: "5551234567",
+    medicaidId: `MM${run}`.slice(0, 32), supermarket: "Test Market",
+    formData: { firstName: "Norm", lastName: "FormDataName", medicaidId: `MM${run}`.slice(0, 32) },
+    hipaaConsentAt: new Date(),
+  }).$returningId();
+  const mmId = mmSub[0].id;
+
+  const bf1 = await caller.compliance.normalization.backfill();
+  ok(bf1.scanned >= 1 && bf1.upserted >= 1, `backfill projected ${bf1.upserted} submission(s)`);
+  ok(bf1.mismatches >= 1, "backfill detected at least one column/formData mismatch");
+
+  const recon = await caller.compliance.normalization.reconciliation();
+  const mmRow = recon.find((r) => r.submissionId === mmId);
+  ok(!!mmRow && mmRow.mismatchFlags.includes("lastName"), "reconciliation flags the lastName mismatch for this client");
+
+  const nstats = await caller.compliance.normalization.stats();
+  ok(nstats.normalized >= 1 && nstats.withMismatches >= 1 && nstats.totalSubmissions >= nstats.normalized, "normalization stats report coverage + mismatches");
+
+  // Idempotency: a second backfill with nothing changed upserts nothing.
+  const bf2 = await caller.compliance.normalization.backfill();
+  ok(bf2.upserted === 0 && bf2.skipped === bf2.scanned, "backfill is idempotent (unchanged rows are skipped)");
+
+  // The reconciliation report surfaces the same mismatch, permission-gated.
+  const reconReport = await caller.compliance.reports.run({ key: "formdata_reconciliation" });
+  ok(reconReport.rows.some((r) => r.clientId === mmId), "the formdata_reconciliation report lists the mismatched client");
+
+  // A worker (COMPLIANCE_VIEW) can read stats but cannot run the backfill.
+  const workerStats = await workerCaller.compliance.normalization.stats();
+  ok(typeof workerStats.normalized === "number", "a viewer can read normalization stats");
+  let backfillForbidden = false;
+  try { await workerCaller.compliance.normalization.backfill(); } catch { backfillForbidden = true; }
+  ok(backfillForbidden, "a viewer cannot run the backfill (COMPLIANCE_MANAGE required)");
+
   console.log("\n══ Phase 13: audit-chain integrity ══");
   const chain = await loadAuditChain(db);
   const verify = verifyAuditChain(chain);

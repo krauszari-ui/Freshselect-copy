@@ -117,6 +117,11 @@ export async function runReport(key: string): Promise<ReportResult> {
       const rows = await db.select().from(documentAccessLog).orderBy(desc(documentAccessLog.createdAt)).limit(500);
       return result(["documentId", "userId", "action", "ip", "createdAt"], rows.map((r) => ({ documentId: r.documentId, userId: r.userId, action: r.action, ip: r.ip, createdAt: r.createdAt })));
     },
+    formdata_reconciliation: async () => {
+      const { listReconciliationMismatches } = await import("./normalize");
+      const rows = await listReconciliationMismatches();
+      return result(["clientId", "mismatchedFields", "reconciledAt"], rows.map((r) => ({ clientId: r.submissionId, mismatchedFields: r.mismatchFlags.join("; "), reconciledAt: r.reconciledAt })));
+    },
   };
   const runner = runners[key];
   if (!runner) throw new Error(`UNKNOWN_REPORT:${key}`);

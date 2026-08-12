@@ -58,6 +58,7 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
   { key: "guidance_changes", title: "Guidance Changes", description: "Recently added guidance documents.", permission: "guidance:view" },
   { key: "manual_overrides", title: "Manual Overrides", description: "Approved requirement exceptions (gate overrides).", permission: "exception:approve" },
   { key: "document_downloads", title: "Document Downloads", description: "Restricted document access/reveal log.", permission: "audit:view" },
+  { key: "formdata_reconciliation", title: "formData Reconciliation", description: "Submissions whose structured columns disagree with the formData payload.", permission: "compliance:view" },
 ];
 
 export const REPORT_KEYS = REPORT_DEFINITIONS.map((r) => r.key);

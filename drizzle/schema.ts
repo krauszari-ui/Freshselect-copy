@@ -1825,3 +1825,34 @@ export const complianceNotifications = mysqlTable("complianceNotifications", {
   idx_complianceNotifications_readAt: index("idx_complianceNotifications_readAt").on(t.readAt),
 }));
 export type ComplianceNotification = typeof complianceNotifications.$inferSelect;
+
+// ─── Normalized projection of submissions.formData ───────────────────────────
+/**
+ * A queryable, canonical projection of key identity fields for each submission,
+ * derived from BOTH the structured columns and the untyped `formData` JSON. Lets
+ * compliance queries avoid per-row JSON parsing and — via `mismatchFlags` —
+ * surfaces where a structured column disagrees with what `formData` says (a data-
+ * integrity signal for the reconciliation report). Additive and rebuildable; the
+ * submissions table remains the source of truth and is never modified.
+ */
+export const submissionNormalized = mysqlTable("submissionNormalized", {
+  id: int("id").autoincrement().primaryKey(),
+  submissionId: int("submissionId").notNull().references(() => submissions.id),
+  medicaidIdNormalized: varchar("medicaidIdNormalized", { length: 64 }),
+  firstName: varchar("firstName", { length: 128 }),
+  lastName: varchar("lastName", { length: 128 }),
+  email: varchar("email", { length: 320 }),
+  phoneNormalized: varchar("phoneNormalized", { length: 32 }),
+  zipcode: varchar("zipcode", { length: 10 }),
+  /** Field names whose structured column disagrees with the formData value. */
+  mismatchFlags: json("mismatchFlags"),
+  /** Hash of the normalization inputs — lets a re-run skip unchanged rows. */
+  sourceHash: varchar("sourceHash", { length: 64 }),
+  reconciledAt: timestamp("reconciledAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => ({
+  uniq_submissionNormalized_submissionId: uniqueIndex("uniq_submissionNormalized_submissionId").on(t.submissionId),
+  idx_submissionNormalized_medicaid: index("idx_submissionNormalized_medicaidIdNormalized").on(t.medicaidIdNormalized),
+}));
+export type SubmissionNormalized = typeof submissionNormalized.$inferSelect;
