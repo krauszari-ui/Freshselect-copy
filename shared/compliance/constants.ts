@@ -142,6 +142,12 @@ export const PERMISSIONS = {
   NUTRITION_VIEW: "nutrition:view",
   NUTRITION_MANAGE: "nutrition:manage",
   CLINICAL_APPROVE: "clinical:approve",
+  // Guidance & clarification library
+  GUIDANCE_VIEW: "guidance:view",
+  GUIDANCE_MANAGE: "guidance:manage",
+  LEGAL_REVIEW: "legal:review",
+  /** View attorney-client privileged / work-product records. */
+  PRIVILEGED_VIEW: "privileged:view",
 } as const;
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 

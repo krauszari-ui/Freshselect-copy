@@ -1645,3 +1645,125 @@ export const overpaymentCases = mysqlTable("overpaymentCases", {
 });
 export type OverpaymentCase = typeof overpaymentCases.$inferSelect;
 export type InsertOverpaymentCase = typeof overpaymentCases.$inferInsert;
+
+// ════════════════════════════════════════════════════════════════════════════
+//  COMPLIANCE MODULE — Guidance & clarification library
+//  Source guidance from CMS/NYSDOH/OMIG/SCNs/MCOs/contracts/attorneys, the
+//  clarification workflow for unclear requirements, and attorney-client
+//  privileged records (protected by a separate permission). Append-only history.
+// ════════════════════════════════════════════════════════════════════════════
+
+export const guidanceDocuments = mysqlTable("guidanceDocuments", {
+  id: int("id").autoincrement().primaryKey(),
+  title: varchar("title", { length: 256 }).notNull(),
+  sourceOrganization: varchar("sourceOrganization", { length: 128 }),
+  sourceType: mysqlEnum("sourceType", ["cms", "nysdoh_ohip", "omig", "scn", "mco", "contract", "attorney", "consultant", "other"]).notNull().default("other"),
+  /** Attorney-client privileged / work-product guidance is gated behind a separate permission. */
+  privileged: boolean("privileged").notNull().default(false),
+  currentVersion: int("currentVersion").notNull().default(1),
+  recordStatus: mysqlEnum("recordStatus", ["active", "archived", "voided", "superseded"]).notNull().default("active"),
+  createdBy: int("createdBy").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => ({ idx_guidanceDocuments_sourceType: index("idx_guidanceDocuments_sourceType").on(t.sourceType) }));
+export type GuidanceDocument = typeof guidanceDocuments.$inferSelect;
+export type InsertGuidanceDocument = typeof guidanceDocuments.$inferInsert;
+
+export const guidanceVersions = mysqlTable("guidanceVersions", {
+  id: int("id").autoincrement().primaryKey(),
+  guidanceDocumentId: int("guidanceDocumentId").notNull().references(() => guidanceDocuments.id),
+  version: int("version").notNull(),
+  summary: text("summary"),
+  sourceUrl: varchar("sourceUrl", { length: 512 }),
+  section: varchar("section", { length: 128 }),
+  documentId: int("documentId").references(() => complianceDocuments.id),
+  effectiveDate: timestamp("effectiveDate"),
+  endDate: timestamp("endDate"),
+  createdBy: int("createdBy").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => ({ uniq_guidanceVersions: uniqueIndex("uniq_guidanceVersions").on(t.guidanceDocumentId, t.version) }));
+export type GuidanceVersion = typeof guidanceVersions.$inferSelect;
+
+/** A precise question about an unclear requirement, driven through the workflow. */
+export const clarificationRequests = mysqlTable("clarificationRequests", {
+  id: int("id").autoincrement().primaryKey(),
+  question: text("question").notNull(),
+  facts: text("facts"),
+  submissionId: int("submissionId").references(() => submissions.id),
+  requirementVersionId: int("requirementVersionId").references(() => requirementVersions.id),
+  controllingGuidanceId: int("controllingGuidanceId").references(() => guidanceDocuments.id),
+  status: mysqlEnum("status", ["submitted", "facts_recorded", "legal_requested", "sent_to_agency", "answered", "interpreted", "closed"]).notNull().default("submitted"),
+  sentToOrganization: varchar("sentToOrganization", { length: 128 }),
+  privileged: boolean("privileged").notNull().default(false),
+  recordStatus: mysqlEnum("recordStatus", ["active", "archived", "voided", "superseded"]).notNull().default("active"),
+  createdBy: int("createdBy").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => ({ idx_clarificationRequests_status: index("idx_clarificationRequests_status").on(t.status) }));
+export type ClarificationRequest = typeof clarificationRequests.$inferSelect;
+export type InsertClarificationRequest = typeof clarificationRequests.$inferInsert;
+
+export const agencyResponses = mysqlTable("agencyResponses", {
+  id: int("id").autoincrement().primaryKey(),
+  clarificationRequestId: int("clarificationRequestId").notNull().references(() => clarificationRequests.id),
+  organization: varchar("organization", { length: 128 }),
+  responseType: mysqlEnum("responseType", ["formal", "informal"]).notNull().default("informal"),
+  /** The response uploaded in original form. */
+  documentId: int("documentId").references(() => complianceDocuments.id),
+  summary: text("summary"),
+  receivedAt: timestamp("receivedAt"),
+  createdBy: int("createdBy").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type AgencyResponse = typeof agencyResponses.$inferSelect;
+
+/** Attorney legal review — privileged; visible only with the privilege permission. */
+export const legalReviews = mysqlTable("legalReviews", {
+  id: int("id").autoincrement().primaryKey(),
+  clarificationRequestId: int("clarificationRequestId").references(() => clarificationRequests.id),
+  requirementVersionId: int("requirementVersionId").references(() => requirementVersions.id),
+  attorneyId: int("attorneyId").references(() => users.id),
+  privileged: boolean("privileged").notNull().default(true),
+  workProduct: boolean("workProduct").notNull().default(true),
+  summary: text("summary"),
+  status: mysqlEnum("status", ["requested", "in_review", "complete"]).notNull().default("requested"),
+  createdBy: int("createdBy").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type LegalReview = typeof legalReviews.$inferSelect;
+
+/** An approved internal interpretation of the guidance/response. */
+export const internalDecisions = mysqlTable("internalDecisions", {
+  id: int("id").autoincrement().primaryKey(),
+  clarificationRequestId: int("clarificationRequestId").references(() => clarificationRequests.id),
+  interpretation: text("interpretation").notNull(),
+  basis: text("basis"),
+  approvedBy: int("approvedBy").references(() => users.id),
+  approvedAt: timestamp("approvedAt"),
+  createdBy: int("createdBy").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type InternalDecision = typeof internalDecisions.$inferSelect;
+
+/** Which requirement versions / clients / services / invoices a decision affects. */
+export const policyChangeImpacts = mysqlTable("policyChangeImpacts", {
+  id: int("id").autoincrement().primaryKey(),
+  internalDecisionId: int("internalDecisionId").notNull().references(() => internalDecisions.id),
+  requirementVersionId: int("requirementVersionId").references(() => requirementVersions.id),
+  affectedSubmissionId: int("affectedSubmissionId").references(() => submissions.id),
+  affectedInvoiceId: int("affectedInvoiceId").references(() => invoiceHeaders.id),
+  note: text("note"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => ({ idx_policyChangeImpacts_decision: index("idx_policyChangeImpacts_internalDecisionId").on(t.internalDecisionId) }));
+export type PolicyChangeImpact = typeof policyChangeImpacts.$inferSelect;
+
+/** Staff training acknowledgment of a decision/guidance. */
+export const trainingAcknowledgments = mysqlTable("trainingAcknowledgments", {
+  id: int("id").autoincrement().primaryKey(),
+  internalDecisionId: int("internalDecisionId").references(() => internalDecisions.id),
+  guidanceDocumentId: int("guidanceDocumentId").references(() => guidanceDocuments.id),
+  userId: int("userId").notNull().references(() => users.id),
+  acknowledgedAt: timestamp("acknowledgedAt").defaultNow().notNull(),
+}, (t) => ({ uniq_trainingAcknowledgments: uniqueIndex("uniq_trainingAcknowledgments").on(t.internalDecisionId, t.userId) }));
+export type TrainingAcknowledgment = typeof trainingAcknowledgments.$inferSelect;

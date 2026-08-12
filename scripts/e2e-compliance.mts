@@ -68,8 +68,16 @@ async function main() {
   const approver = await getUserByEmail(approverEmail);
   ok(!!approver && approver.id === approverId, "second privileged approver created");
 
+  // A worker (holds GUIDANCE_VIEW but NOT PRIVILEGED_VIEW) — used to prove the
+  // attorney-privilege filter actually hides privileged records server-side.
+  const workerEmail = `e2e-worker+${run}@example.com`;
+  const workerId = await createStaffUser({ email: workerEmail, name: "E2E Worker", passwordHash: null, role: "worker", permissions: {} });
+  const worker = await getUserByEmail(workerEmail);
+  ok(!!worker && worker.id === workerId, "worker (non-privileged) user created");
+
   const caller = appRouter.createCaller(ctxFor(admin as User));
   const approverCaller = appRouter.createCaller(ctxFor(approver as User));
+  const workerCaller = appRouter.createCaller(ctxFor(worker as User));
 
   console.log("\n══ Phase 1: create a client (submission) ══");
   const insertedSub = await db.insert(submissions).values({
@@ -197,6 +205,40 @@ async function main() {
   eqAssert(closed.state, "closed", "finding closed after CAPA gate satisfied (by a different approver)");
   const [fRow] = await db.select().from(auditFindings).where(eq(auditFindings.id, finding.id));
   eqAssert(fRow.state, "closed", "finding closure persisted");
+
+  console.log("\n══ Phase 12b: guidance & clarification (attorney-privilege gated) ══");
+  const pubGuide = await caller.compliance.guidance.create({ title: `Public guidance ${run}`, sourceType: "nysdoh_ohip", privileged: false });
+  const privGuide = await caller.compliance.guidance.create({ title: `Privileged memo ${run}`, sourceType: "attorney", privileged: true });
+  ok(!!pubGuide.guidanceId && !!privGuide.guidanceId, "created public + privileged guidance");
+  // Admin (has PRIVILEGED_VIEW) sees both; worker (no PRIVILEGED_VIEW) sees only public.
+  const adminGuides = await caller.compliance.guidance.list();
+  const workerGuides = await workerCaller.compliance.guidance.list();
+  ok(adminGuides.some((g) => g.id === privGuide.guidanceId), "admin sees the privileged guidance");
+  ok(!workerGuides.some((g) => g.id === privGuide.guidanceId), "worker CANNOT see privileged guidance (server-side filter)");
+  ok(workerGuides.some((g) => g.id === pubGuide.guidanceId), "worker still sees public guidance");
+  // Clarification workflow: submitted → facts_recorded → sent_to_agency → answered → interpreted.
+  const clar = await caller.compliance.guidance.clarifications.create({ question: `Is X required for Y? (${run})`, facts: "Facts here", submissionId });
+  await caller.compliance.guidance.clarifications.advance({ id: clar.id, to: "facts_recorded" });
+  await caller.compliance.guidance.clarifications.advance({ id: clar.id, to: "sent_to_agency", sentToOrganization: "NYSDOH" });
+  await caller.compliance.guidance.clarifications.recordResponse({ clarificationRequestId: clar.id, organization: "NYSDOH", responseType: "formal", summary: "Yes, required." });
+  const answered = await caller.compliance.guidance.clarifications.advance({ id: clar.id, to: "answered" });
+  eqAssert(answered.status, "answered", "clarification reached 'answered'");
+  // An illegal jump must be rejected.
+  let badJump = false;
+  try { await caller.compliance.guidance.clarifications.advance({ id: clar.id, to: "closed" }); }
+  catch { badJump = false; } // closed IS allowed from answered; use a real illegal one below
+  try { await caller.compliance.guidance.clarifications.advance({ id: clar.id, to: "submitted" }); } catch { badJump = true; }
+  ok(badJump, "illegal clarification transition rejected");
+  // Internal decision — separation of duties (author ≠ approver).
+  let selfDecisionBlocked = false;
+  try { await caller.compliance.guidance.decisions.approve({ clarificationRequestId: clar.id, interpretation: "X is required.", authorId: admin!.id }); } catch { selfDecisionBlocked = true; }
+  ok(selfDecisionBlocked, "author cannot approve their own internal interpretation (separation of duties)");
+  const decisionId = await approverCaller.compliance.guidance.decisions.approve({ clarificationRequestId: clar.id, interpretation: "X is required.", authorId: admin!.id });
+  ok(decisionId > 0, "internal decision approved by a different user");
+  await approverCaller.compliance.guidance.decisions.recordImpact({ internalDecisionId: decisionId, affectedSubmissionId: submissionId });
+  const ack1 = await workerCaller.compliance.guidance.decisions.acknowledgeTraining({ internalDecisionId: decisionId });
+  const ack2 = await workerCaller.compliance.guidance.decisions.acknowledgeTraining({ internalDecisionId: decisionId });
+  ok(ack1.acknowledged && !ack2.acknowledged, "training acknowledgment is idempotent (once per user)");
 
   console.log("\n══ Phase 13: audit-chain integrity ══");
   const chain = await loadAuditChain(db);

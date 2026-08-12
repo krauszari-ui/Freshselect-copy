@@ -89,3 +89,13 @@ export async function assertClientAccess(user: User, submissionId: number): Prom
 }
 
 export const submissionIdInput = z.object({ submissionId: z.number().int().positive() });
+
+/**
+ * Resolve whether a user holds a SECOND permission (beyond the one the procedure
+ * gate already required) — used e.g. to decide if a viewer may see attorney-client
+ * privileged records. Loads the user's normalized compliance roles best-effort.
+ */
+export async function callerHasPermission(user: User, perm: Permission): Promise<boolean> {
+  const complianceRoles = await loadComplianceRoles(user.id);
+  return hasPermission({ role: user.role, complianceRoles }, perm);
+}

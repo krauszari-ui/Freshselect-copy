@@ -8,7 +8,7 @@
  */
 import { and, eq, lte, sql } from "drizzle-orm";
 import { jobs, type Job } from "../../../drizzle/schema";
-import { requireDb, type Queryer } from "../db";
+import { requireDb, isDuplicateKeyError, type Queryer } from "../db";
 
 export type JobType =
   | "email"
@@ -56,11 +56,6 @@ export async function enqueueJob(opts: EnqueueOptions): Promise<{ enqueued: bool
     if (opts.idempotencyKey && isDuplicateKeyError(err)) return { enqueued: false };
     throw err;
   }
-}
-
-function isDuplicateKeyError(err: unknown): boolean {
-  const code = (err as { code?: string } | null)?.code;
-  return code === "ER_DUP_ENTRY" || code === "ER_DUP_KEY";
 }
 
 /**

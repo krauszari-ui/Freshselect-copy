@@ -36,6 +36,7 @@ import ComplianceDashboard from "./pages/compliance/ComplianceDashboard";
 import RequirementsLibrary from "./pages/compliance/RequirementsLibrary";
 import ComplianceClientPanel from "./pages/compliance/ComplianceClientPanel";
 import AuditWorkspace from "./pages/compliance/AuditWorkspace";
+import GuidanceLibrary from "./pages/compliance/GuidanceLibrary";
 
 function Router() {
   usePageViewLogger();
@@ -72,6 +73,7 @@ function Router() {
       <Route path={"/admin/compliance"} component={ComplianceDashboard} />
       <Route path={"/admin/compliance/requirements"} component={RequirementsLibrary} />
       <Route path={"/admin/compliance/audits"} component={AuditWorkspace} />
+      <Route path={"/admin/compliance/guidance"} component={GuidanceLibrary} />
       <Route path={"/admin/compliance/clients/:id"} component={ComplianceClientPanel} />
 
       {/* Referrer Portal */}
